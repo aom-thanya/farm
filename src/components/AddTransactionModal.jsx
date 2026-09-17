@@ -1,13 +1,11 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
-import { CheckCircle2, ArrowLeft, Save, Loader2 } from 'lucide-react';
+import { Save, Loader2 } from 'lucide-react';
 import Modal from './Modal';
 import { transactionApi } from '../api/gasApi';
 
 export default function AddTransactionModal({ isOpen, onClose, type }) {
-  if (!isOpen || !type) return null;
-  
   const isIncome = type === 'income';
   
   const [step, setStep] = useState(1); // 1 = Select Category, 2 = Fill Form
@@ -22,6 +20,7 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
   const [note, setNote] = useState('');
   
   const categories = useStore(state => state.categories);
+  const user = useStore(state => state.user);
   const addTransaction = useStore(state => state.addTransaction);
   
   const amount = useMemo(() => {
@@ -45,6 +44,8 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
 
   const filteredCategories = categories.filter(c => c.type === type);
 
+  if (!isOpen || !type) return null;
+
   const handleSubmit = (e) => {
     e.preventDefault();
     if (!selectedCategory || amount <= 0) {
@@ -54,6 +55,7 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
 
     const newTx = {
       id: Date.now().toString(),
+      user_id: user?.id || '',
       type: type,
       category: selectedCategory.id,
       cat_name: selectedCategory.name,

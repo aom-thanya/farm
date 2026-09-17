@@ -50,6 +50,12 @@ describe('useStore', () => {
     expect(useStore.getState().transactions.length).toBe(1);
   });
 
+  it('removeTransaction removes the matching transaction', () => {
+    useStore.setState({ transactions: [{ id: 'tx-1' }, { id: 'tx-2' }] });
+    useStore.getState().removeTransaction('tx-1');
+    expect(useStore.getState().transactions).toEqual([{ id: 'tx-2' }]);
+  });
+
   it('setLoading updates loading state', () => {
     useStore.getState().setLoading(true);
     expect(useStore.getState().isLoading).toBe(true);

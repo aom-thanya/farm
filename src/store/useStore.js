@@ -19,6 +19,9 @@ export const useStore = create(
       addTransaction: (transaction) => set((state) => ({ 
         transactions: [...state.transactions, transaction] 
       })),
+      removeTransaction: (id) => set((state) => ({
+        transactions: state.transactions.filter(transaction => String(transaction.id) !== String(id))
+      })),
       
       setCategories: (categories) => set({ categories }),
       addCategory: (category) => set((state) => ({

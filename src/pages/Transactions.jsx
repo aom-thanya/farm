@@ -1,13 +1,35 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { formatMoney, formatDate, cn } from '../lib/utils';
-import { Filter } from 'lucide-react';
+import { Loader2, Trash2 } from 'lucide-react';
+import { transactionApi } from '../api/gasApi';
 
 export default function Transactions() {
   const [filterType, setFilterType] = useState('all'); // all, income, expense
   const dateFilter = useStore(state => state.dateFilter);
   const transactions = useStore(state => state.transactions);
+  const removeTransaction = useStore(state => state.removeTransaction);
   const isLoading = useStore(state => state.isLoading);
+  const [deletingId, setDeletingId] = useState(null);
+
+  const handleDelete = async (transaction) => {
+    const confirmed = window.confirm(
+      `คุณแน่ใจหรือไม่ว่าต้องการลบรายการ${transaction.cat_name ? ` "${transaction.cat_name}"` : ''}? การลบนี้ไม่สามารถย้อนกลับได้`
+    );
+    if (!confirmed) return;
+
+    setDeletingId(transaction.id);
+    try {
+      const response = await transactionApi.deleteTransaction(transaction.id);
+      if (!response.success) throw new Error(response.error || 'Delete failed');
+      removeTransaction(transaction.id);
+    } catch (error) {
+      console.error(error);
+      alert('ลบรายการไม่สำเร็จ โปรดลองใหม่อีกครั้ง');
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -115,7 +137,7 @@ export default function Transactions() {
                 
                 <div className="divide-y divide-gray-100">
                   {dayTxs.map(tx => (
-                    <div key={tx.id} className="p-4 flex justify-between items-center hover:bg-gray-50 transition-colors">
+                    <div key={tx.id} className="p-4 flex justify-between items-center gap-4 hover:bg-gray-50 transition-colors">
                       <div className="flex items-center gap-4">
                         <div className="text-4xl">{tx.cat_emoji}</div>
                         <div>
@@ -130,11 +152,27 @@ export default function Transactions() {
                           </p>
                         </div>
                       </div>
-                      <div className={cn(
-                        "font-bold text-xl",
-                        tx.type === 'income' ? "text-farm-600" : "text-red-500"
-                      )}>
-                        {tx.type === 'income' ? '+' : '-'}{formatMoney(tx.amount)}
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className={cn(
+                          "font-bold text-xl",
+                          tx.type === 'income' ? "text-farm-600" : "text-red-500"
+                        )}>
+                          {tx.type === 'income' ? '+' : '-'}{formatMoney(tx.amount)}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(tx)}
+                          disabled={deletingId === tx.id}
+                          aria-label={`ลบรายการ${tx.cat_name ? ` ${tx.cat_name}` : ''}`}
+                          title="ลบรายการ"
+                          className="p-2 rounded-xl text-gray-400 hover:text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                        >
+                          {deletingId === tx.id ? (
+                            <Loader2 className="w-5 h-5 animate-spin" />
+                          ) : (
+                            <Trash2 className="w-5 h-5" />
+                          )}
+                        </button>
                       </div>
                     </div>
                   ))}

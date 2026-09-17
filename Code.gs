@@ -20,6 +20,8 @@ function doPost(e) {
       return handleLogout(data);
     } else if (action === 'addTransaction') {
       return addTransaction(data);
+    } else if (action === 'deleteTransaction') {
+      return deleteTransaction(data);
     } else if (action === 'addCategory') {
       return addCategory(data);
     } else if (action === 'deleteCategory') {
@@ -91,25 +93,28 @@ function handleLogout(data) {
 
 function addTransaction(data) {
   const sheet = getSpreadsheet().getSheetByName('Transactions');
-  // id, type, category, amount, note, date, buyer_seller, unit_price, quantity, cat_type, cat_name, cat_emoji, created_at
   const id = Utilities.getUuid();
   const createdAt = new Date().toISOString();
-  
-  sheet.appendRow([
+
+  const headers = sheet.getRange(1, 1, 1, sheet.getLastColumn()).getValues()[0];
+  const values = {
     id,
-    data.type,
-    data.category,
-    data.amount,
-    data.note || '',
-    data.date,
-    data.buyer_seller || '',
-    data.unit_price || 0,
-    data.quantity || 1,
-    data.cat_type || '',
-    data.cat_name || '',
-    data.cat_emoji || '',
-    createdAt
-  ]);
+    created_at: createdAt,
+    type: data.type || '',
+    user_id: data.user_id || data.userId || '',
+    category: data.category || '',
+    amount: data.amount || 0,
+    note: data.note || '',
+    date: data.date || '',
+    buyer_seller: data.buyer_seller || '',
+    unit_price: data.unit_price || 0,
+    quantity: data.quantity || 1,
+    cat_type: data.cat_type || '',
+    cat_name: data.cat_name || '',
+    cat_emoji: data.cat_emoji || ''
+  };
+
+  sheet.appendRow(headers.map(header => values[header] ?? ''));
   
   // If a category was used, we might want to update its usage_count
   updateCategoryUsage(data.category);
@@ -133,6 +138,22 @@ function getTransactions() {
     result.push(rowData);
   }
   return respondSuccess(result);
+}
+
+function deleteTransaction(data) {
+  const sheet = getSpreadsheet().getSheetByName('Transactions');
+  const rows = sheet.getDataRange().getValues();
+  if (rows.length < 2) return respondError("Transaction not found");
+
+  const idIndex = rows[0].indexOf('id');
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][idIndex]) === String(data.id)) {
+      sheet.deleteRow(i + 1);
+      return respondSuccess({ message: "Transaction deleted" });
+    }
+  }
+
+  return respondError("Transaction not found");
 }
 
 function addCategory(data) {
@@ -225,7 +246,7 @@ function setupSheets() {
   let txSheet = ss.getSheetByName('Transactions');
   if (!txSheet) {
     txSheet = ss.insertSheet('Transactions');
-    txSheet.appendRow(['id', 'type', 'category', 'amount', 'note', 'date', 'buyer_seller', 'unit_price', 'quantity', 'cat_type', 'cat_name', 'cat_emoji', 'created_at']);
+    txSheet.appendRow(['id', 'created_at', 'type', 'user_id', 'category', 'amount', 'note', 'date', 'buyer_seller', 'unit_price', 'quantity', 'cat_type', 'cat_name', 'cat_emoji']);
   }
   
   // Categories Sheet

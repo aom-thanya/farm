@@ -2,6 +2,42 @@
 // Users need to replace this URL with their own deployed Apps Script Web App URL
 const API_URL = import.meta.env.VITE_API_URL;
 
+const normalizeTransaction = (transaction) => {
+  const isLegacyShiftedRow = /^(income|expense)_/.test(String(transaction.type))
+    && typeof transaction.amount === 'string'
+    && typeof transaction.date === 'number';
+
+  const normalized = isLegacyShiftedRow
+    ? {
+        ...transaction,
+        created_at: transaction.cat_name,
+        type: transaction.created_at,
+        category: transaction.type,
+        amount: transaction.user_id,
+        note: transaction.category,
+        date: transaction.amount,
+        buyer_seller: transaction.note,
+        unit_price: transaction.date,
+        quantity: transaction.buyer_seller,
+        cat_type: transaction.unit_price,
+        cat_name: transaction.quantity,
+        cat_emoji: transaction.cat_type
+      }
+    : transaction;
+
+  return {
+    ...normalized,
+    id: String(normalized.id),
+    type: String(normalized.type).trim().toLowerCase(),
+    amount: Number(normalized.amount) || 0,
+    unit_price: Number(normalized.unit_price) || 0,
+    quantity: Number(normalized.quantity) || 1,
+    date: normalized.date instanceof Date
+      ? normalized.date.toISOString()
+      : String(normalized.date || '')
+  };
+};
+
 export const gasApi = {
   async get(action, params = {}) {
     const url = new URL(API_URL);
@@ -52,10 +88,21 @@ export const authApi = {
 
 export const transactionApi = {
   getTransactions: async () => {
-    return gasApi.get('getTransactions');
+    const response = await gasApi.get('getTransactions');
+    return {
+      ...response,
+      data: Array.isArray(response.data)
+        ? response.data
+            .map(normalizeTransaction)
+            .filter(transaction => ['income', 'expense'].includes(transaction.type))
+        : []
+    };
   },
   addTransaction: async (data) => {
     return gasApi.post('addTransaction', data);
+  },
+  deleteTransaction: async (id) => {
+    return gasApi.post('deleteTransaction', { id });
   }
 };
 
