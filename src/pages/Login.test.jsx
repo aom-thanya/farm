@@ -3,10 +3,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Login from './Login';
 import { BrowserRouter } from 'react-router-dom';
 import { useStore } from '../store/useStore';
+import { authApi } from '../api/gasApi';
 
 // Mock zustand store
 vi.mock('../store/useStore', () => ({
   useStore: vi.fn(),
+}));
+vi.mock('../api/gasApi', () => ({
+  authApi: { login: vi.fn() }
 }));
 
 const mockSetUser = vi.fn();
@@ -14,7 +18,7 @@ const mockSetUser = vi.fn();
 describe('Login Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useStore.mockImplementation((selector) => {
+    useStore.mockImplementation(() => {
       // Return mockSetUser when the component selects state.setUser
       return mockSetUser;
     });
@@ -46,6 +50,7 @@ describe('Login Component', () => {
   });
 
   it('handles mock login correctly', async () => {
+    authApi.login.mockResolvedValue({ success: true, data: { id: 'u1', username: 'admin' } });
     render(
       <BrowserRouter>
         <Login />
@@ -63,6 +68,7 @@ describe('Login Component', () => {
   });
 
   it('shows error on invalid credentials', async () => {
+    authApi.login.mockRejectedValue(new Error('Username หรือ Password ไม่ถูกต้อง'));
     render(
       <BrowserRouter>
         <Login />

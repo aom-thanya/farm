@@ -3,7 +3,7 @@ import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { Save, Loader2 } from 'lucide-react';
 import Modal from './Modal';
-import { transactionApi } from '../api/gasApi';
+import { transactionApi, categoryApi } from '../api/gasApi';
 
 export default function AddTransactionModal({ isOpen, onClose, type }) {
   const isIncome = type === 'income';
@@ -22,6 +22,8 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
   const categories = useStore(state => state.categories);
   const user = useStore(state => state.user);
   const addTransaction = useStore(state => state.addTransaction);
+  const setTransactions = useStore(state => state.setTransactions);
+  const setCategories = useStore(state => state.setCategories);
   
   const amount = useMemo(() => {
     const p = parseFloat(price) || 0;
@@ -32,6 +34,7 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
   // Reset state when modal opens
   useEffect(() => {
     if (isOpen) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setStep(1);
       setSelectedCategory(null);
       setDate(new Date().toISOString().split('T')[0]);
@@ -54,7 +57,6 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
     }
 
     const newTx = {
-      id: Date.now().toString(),
       user_id: user?.id || '',
       type: type,
       category: selectedCategory.id,
@@ -71,12 +73,19 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
     const submitData = async () => {
       setIsSubmitting(true);
       try {
-        // อัปเดตหน้าจอทันที (Optimistic update)
-        addTransaction(newTx);
-        
-        // ส่งข้อมูลไปหลังบ้าน
-        await transactionApi.addTransaction(newTx);
+        const result = await transactionApi.addTransaction(newTx);
+        addTransaction({ ...newTx, id: String(result.data.id) });
         onClose();
+        try {
+          const [transactions, categoriesResult] = await Promise.all([
+            transactionApi.getTransactions(),
+            categoryApi.getCategories()
+          ]);
+          setTransactions(transactions.data);
+          setCategories(categoriesResult.data);
+        } catch (refreshError) {
+          console.error('Failed to refresh after saving:', refreshError);
+        }
       } catch (error) {
         console.error(error);
         alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล โปรดลองใหม่อีกครั้ง');

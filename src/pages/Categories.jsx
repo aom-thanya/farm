@@ -18,6 +18,9 @@ export default function Categories() {
   const [newEmoji, setNewEmoji] = useState('🌟');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [editingCategory, setEditingCategory] = useState(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [deletingId, setDeletingId] = useState(null);
+  const [error, setError] = useState('');
 
   if (isLoading) {
     return (
@@ -39,37 +42,42 @@ export default function Categories() {
 
   const handleAddCategory = async (e) => {
     e.preventDefault();
-    if (!newName) return;
+    const name = newName.trim();
+    if (!name || isSaving) return;
 
-    if (editingCategory) {
-      const updatedCategory = {
-        ...editingCategory,
-        type: activeTab,
-        name: newName,
-        emoji: newEmoji
-      };
-      const response = await categoryApi.updateCategory(updatedCategory);
-      if (response.success) {
+    setIsSaving(true);
+    setError('');
+    try {
+      if (editingCategory) {
+        const updatedCategory = {
+          ...editingCategory,
+          type: activeTab,
+          name,
+          emoji: newEmoji
+        };
+        await categoryApi.updateCategory(updatedCategory);
         updateCategory(updatedCategory);
         setEditingCategory(null);
         setNewName('');
         setShowAdd(false);
+        return;
       }
-      return;
+
+      const newCat = {
+        type: activeTab,
+        name,
+        emoji: newEmoji
+      };
+
+      const response = await categoryApi.addCategory(newCat);
+      addCategory({ ...newCat, id: String(response.data.id), usage_count: 0 });
+      setNewName('');
+      setShowAdd(false);
+    } catch (err) {
+      setError(err.message || 'บันทึกหมวดหมู่ไม่สำเร็จ');
+    } finally {
+      setIsSaving(false);
     }
-    
-    const newCat = {
-      id: `custom_${activeTab}_${Date.now()}`,
-      type: activeTab,
-      name: newName,
-      emoji: newEmoji
-    };
-    
-    addCategory(newCat);
-    setNewName('');
-    setShowAdd(false);
-    
-    // In real app: categoryApi.addCategory(newCat);
   };
 
   const handleEdit = (category) => {
@@ -80,16 +88,25 @@ export default function Categories() {
     setShowAdd(true);
   };
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm('คุณแน่ใจหรือไม่ว่าต้องการลบหมวดหมู่นี้?')) {
-      removeCategory(id);
-      // In real app: categoryApi.deleteCategory(id);
+      setDeletingId(id);
+      setError('');
+      try {
+        await categoryApi.deleteCategory(id);
+        removeCategory(id);
+      } catch (err) {
+        setError(err.message || 'ลบหมวดหมู่ไม่สำเร็จ');
+      } finally {
+        setDeletingId(null);
+      }
     }
   };
 
   return (
     <div className="space-y-6">
       <h1 className="text-3xl font-heading font-bold text-farm-900">จัดการหมวดหมู่</h1>
+      {error && <p role="alert" className="text-red-600">{error}</p>}
       
       <div className="flex bg-white rounded-xl p-1 border border-farm-200">
         <button 
@@ -151,6 +168,7 @@ export default function Categories() {
             <div className="flex gap-3 mt-4">
               <button 
                 type="submit" 
+                disabled={isSaving}
                 className="btn-primary py-2 flex-1 text-base"
               >
                 บันทึก
@@ -194,6 +212,7 @@ export default function Categories() {
               </button>
               <button 
                 onClick={() => handleDelete(cat.id)}
+                disabled={deletingId === cat.id}
                 className="absolute -top-2 -right-2 bg-red-500 text-white p-2 rounded-full shadow-md hover:bg-red-600 transition-colors"
               >
                 <Trash2 className="w-4 h-4" />

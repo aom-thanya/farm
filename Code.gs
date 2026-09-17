@@ -161,7 +161,7 @@ function deleteTransaction(data) {
 function addCategory(data) {
   const sheet = getSpreadsheet().getSheetByName('Categories');
   // id, type, name, emoji, usage_count
-  const id = 'custom_' + data.type + '_' + data.name;
+  const id = 'custom_' + Utilities.getUuid();
   
   sheet.appendRow([
     id,

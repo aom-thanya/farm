@@ -2,8 +2,18 @@
 // Users need to replace this URL with their own deployed Apps Script Web App URL
 const API_URL = import.meta.env.VITE_API_URL;
 
+const parseResponse = async (response) => {
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  const result = await response.json();
+  if (!result || typeof result.success !== 'boolean') {
+    throw new Error('Invalid API response');
+  }
+  if (!result.success) throw new Error(result.error || 'API request failed');
+  return result;
+};
+
 const normalizeTransaction = (transaction) => {
-  const isLegacyShiftedRow = /^(income|expense)_/.test(String(transaction.type))
+  const isLegacyShiftedRow = ['income', 'expense'].includes(String(transaction.created_at).trim().toLowerCase())
     && typeof transaction.amount === 'string'
     && typeof transaction.date === 'number';
 
@@ -49,8 +59,9 @@ const normalizeCategory = (category) => ({
 
 export const gasApi = {
   async get(action, params = {}) {
+    if (!API_URL) throw new Error('VITE_API_URL is not configured');
     const url = new URL(API_URL);
-    url.searchParams.append('action', action);
+    url.searchParams.set('action', action);
     Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
 
     try {
@@ -58,8 +69,7 @@ export const gasApi = {
       // Often, JSONP or passing via POST is preferred if standard GET fails.
       // We will try standard fetch GET assuming Web App deployed "Execute as: me, Access: Anyone"
       const response = await fetch(url.toString());
-      if (!response.ok) throw new Error('Network response was not ok');
-      return await response.json();
+      return await parseResponse(response);
     } catch (error) {
       console.error('API GET Error:', error);
       throw error;
@@ -67,9 +77,12 @@ export const gasApi = {
   },
 
   async post(action, payload) {
+    if (!API_URL) throw new Error('VITE_API_URL is not configured');
     try {
       // Google Apps Script doPost handles requests better when body is stringified JSON and Content-Type text/plain
-      const response = await fetch(API_URL + '?action=' + action, {
+      const url = new URL(API_URL);
+      url.searchParams.set('action', action);
+      const response = await fetch(url.toString(), {
         method: 'POST',
         headers: {
           // Use text/plain to avoid CORS preflight which Apps Script blocks
@@ -77,8 +90,7 @@ export const gasApi = {
         },
         body: JSON.stringify(payload)
       });
-      if (!response.ok) throw new Error('Network response was not ok');
-      return await response.json();
+      return await parseResponse(response);
     } catch (error) {
       console.error('API POST Error:', error);
       throw error;

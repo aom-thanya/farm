@@ -33,7 +33,9 @@ export default function Login() {
       setLoading(false);
       
     } catch (err) {
-      setError('เกิดข้อผิดพลาดในการเชื่อมต่อ');
+      setError(err.message === 'Username หรือ Password ไม่ถูกต้อง'
+        ? 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'
+        : 'เกิดข้อผิดพลาดในการเชื่อมต่อ');
       setLoading(false);
     }
   };

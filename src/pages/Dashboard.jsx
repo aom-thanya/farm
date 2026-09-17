@@ -1,12 +1,9 @@
-import { useState, useEffect } from 'react';
 import { useStore } from '../store/useStore';
 import { formatMoney, cn } from '../lib/utils';
-import { transactionApi } from '../api/gasApi';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
 
 export default function Dashboard() {
   const transactions = useStore(state => state.transactions);
-  const setTransactions = useStore(state => state.setTransactions);
   const dateFilter = useStore(state => state.dateFilter);
   const isLoading = useStore(state => state.isLoading);
 

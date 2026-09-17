@@ -33,7 +33,6 @@ export default function EmojiPickerPopover({ type, selectedEmoji, onSelect, onCl
   const popoverRef = useRef(null);
 
   const emojiList = type === 'income' ? incomeEmojis : expenseEmojis;
-  const themeColor = type === 'income' ? 'farm' : 'red';
 
   // Handle click outside to close
   useEffect(() => {

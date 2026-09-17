@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { format, addMonths, subMonths } from 'date-fns';
 import { th } from 'date-fns/locale';
 import AddTransactionModal from './AddTransactionModal';
-import { transactionApi, categoryApi } from '../api/gasApi';
+import { transactionApi, categoryApi, authApi } from '../api/gasApi';
 
 export default function Layout() {
   const user = useStore(state => state.user);
@@ -23,12 +23,14 @@ export default function Layout() {
   const [modalType, setModalType] = useState(null); // 'income' | 'expense' | null
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
     if (!user) return;
     
     const loadData = async (showLoading = true) => {
       if (showLoading) setLoading(true);
+      setLoadError('');
       try {
         const [txRes, catRes] = await Promise.all([
           transactionApi.getTransactions(),
@@ -42,6 +44,7 @@ export default function Layout() {
         }
       } catch (error) {
         console.error('Failed to load data:', error);
+        setLoadError('โหลดข้อมูลไม่สำเร็จ โปรดลองเปิดหน้านี้อีกครั้ง');
       } finally {
         if (showLoading) setLoading(false);
       }
@@ -62,14 +65,16 @@ export default function Layout() {
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [user]);
+  }, [user, setCategories, setLoading, setTransactions]);
 
   // Close mobile menu when route changes
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     setIsMobileMenuOpen(false);
   }, [location.pathname]);
 
   const handleLogout = () => {
+    authApi.logout(user.id).catch(error => console.error('Failed to record logout:', error));
     logout();
     navigate('/login');
   };
@@ -192,6 +197,7 @@ export default function Layout() {
 
       {/* Main Content Area */}
       <main className="p-4 md:p-8 max-w-6xl mx-auto flex flex-col min-h-screen">
+        {loadError && <p role="alert" className="mb-4 text-red-600">{loadError}</p>}
         
         {/* Top Header (Month Selector & Add Buttons) */}
         {showHeader && (
