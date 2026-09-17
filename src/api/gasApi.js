@@ -7,7 +7,7 @@ export const gasApi = {
     const url = new URL(API_URL);
     url.searchParams.append('action', action);
     Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
-    
+
     try {
       // NOTE: Using fetch for GET might get blocked by CORS from google script if not setup correctly.
       // Often, JSONP or passing via POST is preferred if standard GET fails.
