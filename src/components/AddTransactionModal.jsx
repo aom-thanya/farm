@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../store/useStore';
-import { cn, todayDateInput } from '../lib/utils';
+import { cn, todayDateInput, transactionFilterRange } from '../lib/utils';
 import { Save, Loader2 } from 'lucide-react';
 import Modal from './Modal';
 import EmojiPickerPopover from './EmojiPickerPopover';
@@ -33,6 +33,7 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
   const addCategory = useStore(state => state.addCategory);
   const setTransactions = useStore(state => state.setTransactions);
   const setCategories = useStore(state => state.setCategories);
+  const dateFilter = useStore(state => state.dateFilter);
   
   const amount = useMemo(() => {
     const p = parseFloat(price) || 0;
@@ -118,14 +119,17 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
       setIsSubmitting(true);
       try {
         const result = await transactionApi.addTransaction(newTx);
-        addTransaction({ ...newTx, id: String(result.data.id) });
+        const range = transactionFilterRange(dateFilter);
+        if (range && newTx.date >= range.startDate && newTx.date <= range.endDate) {
+          addTransaction({ ...newTx, id: String(result.data.id) });
+        }
         onClose();
         try {
           const [transactions, categoriesResult] = await Promise.all([
-            transactionApi.getTransactions(),
+            range ? transactionApi.getTransactions(range) : Promise.resolve(null),
             categoryApi.getCategories()
           ]);
-          setTransactions(transactions.data);
+          if (transactions) setTransactions(transactions.data);
           setCategories(categoriesResult.data);
         } catch (refreshError) {
           console.error('Failed to refresh after saving:', refreshError);

@@ -62,13 +62,13 @@ describe('Dashboard Component', () => {
     expect(screen.getByText(/ได้กำไร/)).toBeInTheDocument();
   });
 
-  it('renders bar chart when dateFilter is all', () => {
+  it('renders a monthly bar chart for the selected year', () => {
     useStore.mockImplementation((selector) => {
       return selector({
         transactions: [
           { id: 1, amount: 5000, type: 'income', category: 'cat1', date: new Date().toISOString() },
         ],
-        dateFilter: { type: 'all' },
+        dateFilter: { type: 'year', year: new Date().getFullYear() },
         isLoading: false
       });
     });

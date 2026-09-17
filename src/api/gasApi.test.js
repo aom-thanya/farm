@@ -3,6 +3,7 @@ import { gasApi, transactionApi, categoryApi } from './gasApi';
 import { useStore } from '../store/useStore';
 
 describe('Google Apps Script API', () => {
+  const range = { startDate: '2026-09-17', endDate: '2026-09-17' };
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
     useStore.setState({ user: null });
@@ -30,8 +31,9 @@ describe('Google Apps Script API', () => {
   it('sends the session token on reads and writes', async () => {
     useStore.setState({ user: { id: 'u1', token: 'session-token' } });
     fetch.mockResolvedValue({ ok: true, json: async () => ({ success: true, data: [] }) });
-    await transactionApi.getTransactions();
+    await transactionApi.getTransactions(range);
     expect(JSON.parse(fetch.mock.calls[0][1].body).token).toBe('session-token');
+    expect(JSON.parse(fetch.mock.calls[0][1].body)).toMatchObject(range);
     await categoryApi.addCategory({ type: 'income', name: 'Mango' });
     expect(JSON.parse(fetch.mock.calls[1][1].body)).toMatchObject({ token: 'session-token', name: 'Mango' });
   });
@@ -41,7 +43,7 @@ describe('Google Apps Script API', () => {
       { id: 7, type: 'income', amount: '12.5', quantity: '2', date: '2026-09-17' },
       { id: 8, type: 'other', amount: 1 }
     ] }) });
-    const result = await transactionApi.getTransactions();
+    const result = await transactionApi.getTransactions(range);
     expect(result.data).toMatchObject([{ id: '7', amount: 12.5, quantity: 2 }]);
   });
 
@@ -50,8 +52,17 @@ describe('Google Apps Script API', () => {
       id: 'tx-1', type: 'income', amount: 100,
       created_at: '2026-09-17T14:41:16.368Z', date: '2026-09-16T17:00:00.000Z'
     }] }) });
-    const result = await transactionApi.getTransactions();
+    const result = await transactionApi.getTransactions(range);
     expect(result.data[0].date).toBe('2026-09-17');
+  });
+
+  it('does not display out-of-range rows if an older deployment returns extra data', async () => {
+    fetch.mockResolvedValue({ ok: true, json: async () => ({ success: true, data: [
+      { id: 'today', type: 'income', amount: 100, date: '2026-09-17' },
+      { id: 'tomorrow', type: 'income', amount: 100, date: '2026-09-18' }
+    ] }) });
+    const result = await transactionApi.getTransactions(range);
+    expect(result.data.map(row => row.id)).toEqual(['today']);
   });
 
   it('recovers legacy rows shifted by one column, including custom categories', async () => {
@@ -61,7 +72,7 @@ describe('Google Apps Script API', () => {
       buyer_seller: 1, unit_price: 'income', quantity: 'Mango',
       cat_type: '🥭', cat_name: '2026-09-17T00:00:00.000Z'
     }] }) });
-    const result = await transactionApi.getTransactions();
+    const result = await transactionApi.getTransactions(range);
     expect(result.data[0]).toMatchObject({ type: 'income', category: 'custom_income_123', amount: 25, date: '2026-09-17', cat_name: 'Mango' });
   });
 });

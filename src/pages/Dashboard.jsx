@@ -23,27 +23,7 @@ export default function Dashboard() {
     );
   }
 
-  // Filter transactions based on dateFilter
-  const filteredTx = transactions.filter(tx => {
-    if (dateFilter.type === 'all') return true;
-    
-    const txDate = parseCalendarDate(tx.date);
-    
-    if (dateFilter.type === 'month') {
-      return txDate.getMonth() === dateFilter.date.getMonth() && txDate.getFullYear() === dateFilter.date.getFullYear();
-    }
-    
-    if (dateFilter.type === 'range') {
-      if (!dateFilter.start || !dateFilter.end) return true;
-      const start = parseCalendarDate(dateFilter.start);
-      start.setHours(0, 0, 0, 0);
-      const end = parseCalendarDate(dateFilter.end);
-      end.setHours(23, 59, 59, 999);
-      return txDate >= start && txDate <= end;
-    }
-    
-    return true;
-  });
+  const filteredTx = transactions;
 
   const incomeTxs = filteredTx.filter(t => t.type === 'income');
   const expenseTxs = filteredTx.filter(t => t.type === 'expense');
@@ -73,9 +53,9 @@ export default function Dashboard() {
   const incomeSummary = groupByCategory(incomeTxs, totalIncome);
   const expenseSummary = groupByCategory(expenseTxs, totalExpense);
 
-  // Chart data for 'all' mode
+  // Monthly comparison within the selected year
   let chartData = [];
-  if (dateFilter.type === 'all') {
+  if (dateFilter.type === 'year') {
     const monthlyData = transactions.reduce((acc, tx) => {
       const date = parseCalendarDate(tx.date);
       const monthYear = `${date.toLocaleString('th-TH', { month: 'short' })} ${date.getFullYear()}`;
@@ -136,7 +116,7 @@ export default function Dashboard() {
       </div>
 
       {/* Breakdowns or Chart */}
-      {dateFilter.type === 'all' ? (
+      {dateFilter.type === 'year' ? (
         <div className="card p-4 sm:p-8">
           <h2 className="text-lg sm:text-xl font-heading font-bold mb-6 text-center text-gray-800">
             📊 เปรียบเทียบรายรับ - รายจ่าย รายเดือน
@@ -192,7 +172,7 @@ export default function Dashboard() {
                 </div>
               </div>
             )) : (
-              <p className="text-center text-gray-400 py-4">ยังไม่มีรายรับ{dateFilter.type === 'all' ? '' : 'ในช่วงเวลานี้'}</p>
+              <p className="text-center text-gray-400 py-4">ยังไม่มีรายรับในช่วงเวลานี้</p>
             )}
           </div>
         </div>
@@ -219,7 +199,7 @@ export default function Dashboard() {
                 </div>
               </div>
             )) : (
-              <p className="text-center text-gray-400 py-4">ยังไม่มีรายจ่าย{dateFilter.type === 'all' ? '' : 'ในช่วงเวลานี้'}</p>
+              <p className="text-center text-gray-400 py-4">ยังไม่มีรายจ่ายในช่วงเวลานี้</p>
             )}
           </div>
         </div>
@@ -228,7 +208,7 @@ export default function Dashboard() {
 
       {/* Insights */}
       <div className="card p-8 bg-white text-center shadow-lg border-2 border-farm-100">
-        <p className="text-xl font-bold text-gray-500 mb-4">สถานะ{dateFilter.type === 'all' ? 'รวมทั้งหมด' : dateFilter.type === 'month' ? 'เดือนนี้' : 'ตามช่วงวันที่เลือก'}</p>
+        <p className="text-xl font-bold text-gray-500 mb-4">สถานะ{dateFilter.type === 'year' ? 'ปีที่เลือก' : dateFilter.type === 'month' ? 'เดือนที่เลือก' : 'ตามช่วงวันที่เลือก'}</p>
         
         {totalIncome > 0 || totalExpense > 0 ? (
           <>
@@ -261,7 +241,7 @@ export default function Dashboard() {
             </ul>
           </>
         ) : (
-           <p className="text-2xl font-bold text-gray-400 my-8">ยังไม่มีข้อมูล{dateFilter.type === 'all' ? '' : 'ในช่วงเวลานี้'}</p>
+           <p className="text-2xl font-bold text-gray-400 my-8">ยังไม่มีข้อมูลในช่วงเวลานี้</p>
         )}
       </div>
 

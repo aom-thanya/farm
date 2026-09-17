@@ -266,7 +266,7 @@ export default function Layout() {
                   </button>
                   
                   <h2 className="text-xl md:text-2xl font-heading font-bold px-4 text-center text-gray-800 flex-1 min-w-[160px]">
-                    {format(dateFilter.date, 'MMMM yyyy', { locale: th })}
+                    {format(dateFilter.date, 'MMMM', { locale: th })} {dateFilter.date.getFullYear() + 543}
                   </h2>
                   
                   <button 
@@ -283,6 +283,7 @@ export default function Layout() {
                 <div className="flex items-center gap-2 w-full md:w-auto animate-in fade-in slide-in-from-top-2 duration-300 bg-white p-2 rounded-2xl shadow-sm md:shadow-none md:bg-transparent md:p-0">
                   <input 
                     type="date"
+                    aria-label="วันเริ่มต้น"
                     value={dateFilter.start}
                     onChange={(e) => setDateFilter({ ...dateFilter, start: e.target.value })}
                     className="bg-gray-50 border border-gray-200 rounded-xl p-2 text-sm font-bold text-gray-700 outline-none focus:border-farm-500 w-full"
@@ -290,6 +291,7 @@ export default function Layout() {
                   <span className="text-gray-400 font-bold">-</span>
                   <input 
                     type="date"
+                    aria-label="วันสิ้นสุด"
                     value={dateFilter.end}
                     onChange={(e) => setDateFilter({ ...dateFilter, end: e.target.value })}
                     className="bg-gray-50 border border-gray-200 rounded-xl p-2 text-sm font-bold text-gray-700 outline-none focus:border-farm-500 w-full"

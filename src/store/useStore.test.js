@@ -9,7 +9,7 @@ describe('useStore', () => {
       transactions: [],
       categories: [],
       isLoading: false,
-      dateFilter: { type: 'month', date: new Date() },
+      dateFilter: { type: 'day', start: '2026-09-17', end: '2026-09-17' },
     });
   });
 
@@ -19,8 +19,8 @@ describe('useStore', () => {
     expect(state.transactions).toEqual([]);
     expect(state.categories).toEqual([]);
     expect(state.isLoading).toBe(false);
-    expect(state.dateFilter.type).toBe('month');
-    expect(state.dateFilter.date).toBeInstanceOf(Date);
+    expect(state.dateFilter.type).toBe('day');
+    expect(state.dateFilter.start).toBe('2026-09-17');
   });
 
   it('setUser sets the user', () => {
@@ -80,7 +80,7 @@ describe('useStore', () => {
   });
 
   it('setDateFilter updates the filter correctly', () => {
-    useStore.getState().setDateFilter({ type: 'all' });
-    expect(useStore.getState().dateFilter).toEqual({ type: 'all' });
+    useStore.getState().setDateFilter({ type: 'year', year: 2026 });
+    expect(useStore.getState().dateFilter).toEqual({ type: 'year', year: 2026 });
   });
 });

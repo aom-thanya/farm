@@ -108,7 +108,10 @@ export const transactionApi = {
       data: Array.isArray(response.data)
         ? response.data
             .map(normalizeTransaction)
-            .filter(transaction => ['income', 'expense'].includes(transaction.type))
+            .filter(transaction =>
+              ['income', 'expense'].includes(transaction.type) &&
+              transaction.date >= range.startDate && transaction.date <= range.endDate
+            )
         : []
     };
   },

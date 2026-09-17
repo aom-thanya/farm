@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { formatMoney, formatDate, parseCalendarDate, transactionDateKey, cn } from '../lib/utils';
+import { formatMoney, formatDate, transactionDateKey, cn } from '../lib/utils';
 import { Loader2, Trash2 } from 'lucide-react';
 import { transactionApi } from '../api/gasApi';
 
 export default function Transactions() {
   const [filterType, setFilterType] = useState('all'); // all, income, expense
-  const dateFilter = useStore(state => state.dateFilter);
   const transactions = useStore(state => state.transactions);
   const removeTransaction = useStore(state => state.removeTransaction);
   const isLoading = useStore(state => state.isLoading);
@@ -47,30 +46,8 @@ export default function Transactions() {
     );
   }
 
-  // Filter by date first
-  const currentMonthTx = transactions.filter(tx => {
-    if (dateFilter.type === 'all') return true;
-    
-    const txDate = parseCalendarDate(transactionDateKey(tx.date));
-    
-    if (dateFilter.type === 'month') {
-      return txDate.getMonth() === dateFilter.date.getMonth() && txDate.getFullYear() === dateFilter.date.getFullYear();
-    }
-    
-    if (dateFilter.type === 'range') {
-      if (!dateFilter.start || !dateFilter.end) return true;
-      const start = parseCalendarDate(dateFilter.start);
-      start.setHours(0, 0, 0, 0);
-      const end = parseCalendarDate(dateFilter.end);
-      end.setHours(23, 59, 59, 999);
-      return txDate >= start && txDate <= end;
-    }
-    
-    return true;
-  });
-
-  // Sort by date desc
-  const sortedTx = [...currentMonthTx].sort((a, b) =>
+  // The API already returns only transactions in the selected date range.
+  const sortedTx = [...transactions].sort((a, b) =>
     transactionDateKey(b.date).localeCompare(transactionDateKey(a.date))
   );
   

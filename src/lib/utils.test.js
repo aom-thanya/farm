@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cn, formatMoney, formatDate, parseCalendarDate, transactionDateKey } from './utils';
+import { cn, formatMoney, formatDate, parseCalendarDate, transactionDateKey, transactionFilterRange } from './utils';
 
 describe('utils', () => {
   describe('cn', () => {
@@ -52,5 +52,15 @@ describe('utils', () => {
   it('restores the selected Thai calendar date from a Sheets timestamp', () => {
     expect(transactionDateKey('2026-09-16T17:00:00.000Z')).toBe('2026-09-17');
     expect(transactionDateKey('2026-09-17')).toBe('2026-09-17');
+  });
+
+  it('builds inclusive day, month, and year ranges for API requests', () => {
+    expect(transactionFilterRange({ type: 'day', start: '2026-09-17', end: '2026-09-19' }))
+      .toEqual({ startDate: '2026-09-17', endDate: '2026-09-19' });
+    expect(transactionFilterRange({ type: 'month', date: new Date(2024, 1, 1) }))
+      .toEqual({ startDate: '2024-02-01', endDate: '2024-02-29' });
+    expect(transactionFilterRange({ type: 'year', year: 2026 }))
+      .toEqual({ startDate: '2026-01-01', endDate: '2026-12-31' });
+    expect(transactionFilterRange({ type: 'day', start: '2026-09-19', end: '2026-09-17' })).toBeNull();
   });
 });

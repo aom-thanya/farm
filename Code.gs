@@ -179,7 +179,11 @@ function getTransactions(filter) {
       : /^\d{4}-\d{2}-\d{2}$/.test(String(rawDate))
         ? String(rawDate)
         : Utilities.formatDate(parsedDate, spreadsheet.getSpreadsheetTimeZone(), 'yyyy-MM-dd');
-    if (date >= startDate && date <= endDate) result.push(rowData);
+    if (date >= startDate && date <= endDate) {
+      if (isLegacyShiftedRow) rowData.amount = date;
+      else rowData.date = date;
+      result.push(rowData);
+    }
   }
   return respondSuccess(result);
 }
