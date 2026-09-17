@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Home, List, Settings, LogOut, ChevronLeft, ChevronRight, Plus, Menu } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { cn } from '../lib/utils';
+import { cn, todayDateInput } from '../lib/utils';
 import { useState, useEffect } from 'react';
 import { format, addMonths, subMonths } from 'date-fns';
 import { th } from 'date-fns/locale';
@@ -222,7 +222,7 @@ export default function Layout() {
                 </button>
                 <button 
                   onClick={() => {
-                    const today = new Date().toISOString().split('T')[0];
+                    const today = todayDateInput();
                     setDateFilter({ type: 'range', start: today, end: today });
                   }}
                   className={cn(

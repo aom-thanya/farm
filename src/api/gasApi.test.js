@@ -45,6 +45,15 @@ describe('Google Apps Script API', () => {
     expect(result.data).toMatchObject([{ id: '7', amount: 12.5, quantity: 2 }]);
   });
 
+  it('keeps the selected date when Sheets serializes Bangkok midnight as the previous UTC day', async () => {
+    fetch.mockResolvedValue({ ok: true, json: async () => ({ success: true, data: [{
+      id: 'tx-1', type: 'income', amount: 100,
+      created_at: '2026-09-17T14:41:16.368Z', date: '2026-09-16T17:00:00.000Z'
+    }] }) });
+    const result = await transactionApi.getTransactions();
+    expect(result.data[0].date).toBe('2026-09-17');
+  });
+
   it('recovers legacy rows shifted by one column, including custom categories', async () => {
     fetch.mockResolvedValue({ ok: true, json: async () => ({ success: true, data: [{
       id: 'tx-1', created_at: 'income', type: 'custom_income_123', user_id: 25,

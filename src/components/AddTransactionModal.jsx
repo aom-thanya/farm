@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from 'react';
 import { useStore } from '../store/useStore';
-import { cn } from '../lib/utils';
+import { cn, todayDateInput } from '../lib/utils';
 import { Save, Loader2 } from 'lucide-react';
 import Modal from './Modal';
 import EmojiPickerPopover from './EmojiPickerPopover';
@@ -21,7 +21,7 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
   const [toast, setToast] = useState('');
   
   // Form State
-  const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(todayDateInput);
   const [price, setPrice] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [person, setPerson] = useState('');
@@ -46,7 +46,7 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setStep(1);
       setSelectedCategory(null);
-      setDate(new Date().toISOString().split('T')[0]);
+      setDate(todayDateInput());
       setPrice('');
       setQuantity('1');
       setPerson('');
@@ -105,6 +105,7 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
       category: selectedCategory.id,
       cat_name: selectedCategory.name,
       cat_emoji: selectedCategory.emoji,
+      cat_type: selectedCategory.type || type,
       amount: amount,
       date: date,
       unit_price: parseFloat(price) || 0,

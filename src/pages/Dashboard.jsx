@@ -1,5 +1,5 @@
 import { useStore } from '../store/useStore';
-import { formatMoney, cn } from '../lib/utils';
+import { formatMoney, parseCalendarDate, cn } from '../lib/utils';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, LabelList } from 'recharts';
 
 export default function Dashboard() {
@@ -27,7 +27,7 @@ export default function Dashboard() {
   const filteredTx = transactions.filter(tx => {
     if (dateFilter.type === 'all') return true;
     
-    const txDate = new Date(tx.date);
+    const txDate = parseCalendarDate(tx.date);
     
     if (dateFilter.type === 'month') {
       return txDate.getMonth() === dateFilter.date.getMonth() && txDate.getFullYear() === dateFilter.date.getFullYear();
@@ -35,9 +35,9 @@ export default function Dashboard() {
     
     if (dateFilter.type === 'range') {
       if (!dateFilter.start || !dateFilter.end) return true;
-      const start = new Date(dateFilter.start);
+      const start = parseCalendarDate(dateFilter.start);
       start.setHours(0, 0, 0, 0);
-      const end = new Date(dateFilter.end);
+      const end = parseCalendarDate(dateFilter.end);
       end.setHours(23, 59, 59, 999);
       return txDate >= start && txDate <= end;
     }
@@ -77,7 +77,7 @@ export default function Dashboard() {
   let chartData = [];
   if (dateFilter.type === 'all') {
     const monthlyData = transactions.reduce((acc, tx) => {
-      const date = new Date(tx.date);
+      const date = parseCalendarDate(tx.date);
       const monthYear = `${date.toLocaleString('th-TH', { month: 'short' })} ${date.getFullYear()}`;
       const sortKey = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
       

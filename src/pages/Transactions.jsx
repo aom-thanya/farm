@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
-import { formatMoney, formatDate, cn } from '../lib/utils';
+import { formatMoney, formatDate, parseCalendarDate, transactionDateKey, cn } from '../lib/utils';
 import { Loader2, Trash2 } from 'lucide-react';
 import { transactionApi } from '../api/gasApi';
 
@@ -51,7 +51,7 @@ export default function Transactions() {
   const currentMonthTx = transactions.filter(tx => {
     if (dateFilter.type === 'all') return true;
     
-    const txDate = new Date(tx.date);
+    const txDate = parseCalendarDate(transactionDateKey(tx.date));
     
     if (dateFilter.type === 'month') {
       return txDate.getMonth() === dateFilter.date.getMonth() && txDate.getFullYear() === dateFilter.date.getFullYear();
@@ -59,9 +59,9 @@ export default function Transactions() {
     
     if (dateFilter.type === 'range') {
       if (!dateFilter.start || !dateFilter.end) return true;
-      const start = new Date(dateFilter.start);
+      const start = parseCalendarDate(dateFilter.start);
       start.setHours(0, 0, 0, 0);
-      const end = new Date(dateFilter.end);
+      const end = parseCalendarDate(dateFilter.end);
       end.setHours(23, 59, 59, 999);
       return txDate >= start && txDate <= end;
     }
@@ -70,7 +70,9 @@ export default function Transactions() {
   });
 
   // Sort by date desc
-  const sortedTx = [...currentMonthTx].sort((a, b) => new Date(b.date) - new Date(a.date));
+  const sortedTx = [...currentMonthTx].sort((a, b) =>
+    transactionDateKey(b.date).localeCompare(transactionDateKey(a.date))
+  );
   
   const filteredTx = sortedTx.filter(tx => {
     if (filterType === 'all') return true;
@@ -79,7 +81,7 @@ export default function Transactions() {
 
   // Group by date
   const groupedTx = filteredTx.reduce((acc, tx) => {
-    const d = tx.date.split('T')[0];
+    const d = transactionDateKey(tx.date);
     if (!acc[d]) acc[d] = [];
     acc[d].push(tx);
     return acc;

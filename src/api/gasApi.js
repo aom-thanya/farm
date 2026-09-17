@@ -1,6 +1,7 @@
 // API Layer for Google Apps Script
 // Users need to replace this URL with their own deployed Apps Script Web App URL
 import { useStore } from '../store/useStore';
+import { transactionDateKey } from '../lib/utils';
 
 const API_URL = import.meta.env.VITE_API_URL;
 const getToken = () => useStore.getState().user?.token;
@@ -48,9 +49,7 @@ const normalizeTransaction = (transaction) => {
     amount: Number(normalized.amount) || 0,
     unit_price: Number(normalized.unit_price) || 0,
     quantity: Number(normalized.quantity) || 1,
-    date: normalized.date instanceof Date
-      ? normalized.date.toISOString()
-      : String(normalized.date || '')
+    date: transactionDateKey(normalized.date)
   };
 };
 

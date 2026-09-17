@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { cn, formatMoney, formatDate } from './utils';
+import { cn, formatMoney, formatDate, parseCalendarDate, transactionDateKey } from './utils';
 
 describe('utils', () => {
   describe('cn', () => {
@@ -27,6 +27,13 @@ describe('utils', () => {
   });
 
   describe('formatDate', () => {
+    it('keeps a date-only value on the same calendar day', () => {
+      const date = parseCalendarDate('2026-09-17');
+      expect(date.getFullYear()).toBe(2026);
+      expect(date.getMonth()).toBe(8);
+      expect(date.getDate()).toBe(17);
+      expect(formatDate('2026-09-17')).toContain('17');
+    });
     it('formats date string to Thai format', () => {
       const dateStr = '2026-05-10T00:00:00.000Z';
       const result = formatDate(dateStr);
@@ -40,5 +47,10 @@ describe('utils', () => {
       expect(formatDate(null)).toBe('');
       expect(formatDate(undefined)).toBe('');
     });
+  });
+
+  it('restores the selected Thai calendar date from a Sheets timestamp', () => {
+    expect(transactionDateKey('2026-09-16T17:00:00.000Z')).toBe('2026-09-17');
+    expect(transactionDateKey('2026-09-17')).toBe('2026-09-17');
   });
 });
