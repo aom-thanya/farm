@@ -1,6 +1,9 @@
 // API Layer for Google Apps Script
 // Users need to replace this URL with their own deployed Apps Script Web App URL
+import { useStore } from '../store/useStore';
+
 const API_URL = import.meta.env.VITE_API_URL;
+const getToken = () => useStore.getState().user?.token;
 
 const parseResponse = async (response) => {
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -8,7 +11,10 @@ const parseResponse = async (response) => {
   if (!result || typeof result.success !== 'boolean') {
     throw new Error('Invalid API response');
   }
-  if (!result.success) throw new Error(result.error || 'API request failed');
+  if (!result.success) {
+    if (result.error === 'UNAUTHORIZED') useStore.getState().logout();
+    throw new Error(result.error || 'API request failed');
+  }
   return result;
 };
 
@@ -59,21 +65,7 @@ const normalizeCategory = (category) => ({
 
 export const gasApi = {
   async get(action, params = {}) {
-    if (!API_URL) throw new Error('VITE_API_URL is not configured');
-    const url = new URL(API_URL);
-    url.searchParams.set('action', action);
-    Object.keys(params).forEach(key => url.searchParams.append(key, params[key]));
-
-    try {
-      // NOTE: Using fetch for GET might get blocked by CORS from google script if not setup correctly.
-      // Often, JSONP or passing via POST is preferred if standard GET fails.
-      // We will try standard fetch GET assuming Web App deployed "Execute as: me, Access: Anyone"
-      const response = await fetch(url.toString());
-      return await parseResponse(response);
-    } catch (error) {
-      console.error('API GET Error:', error);
-      throw error;
-    }
+    return gasApi.post(action, params);
   },
 
   async post(action, payload) {
@@ -82,13 +74,14 @@ export const gasApi = {
       // Google Apps Script doPost handles requests better when body is stringified JSON and Content-Type text/plain
       const url = new URL(API_URL);
       url.searchParams.set('action', action);
+      const token = getToken();
       const response = await fetch(url.toString(), {
         method: 'POST',
         headers: {
           // Use text/plain to avoid CORS preflight which Apps Script blocks
           'Content-Type': 'text/plain;charset=utf-8',
         },
-        body: JSON.stringify(payload)
+        body: JSON.stringify({ ...payload, ...(token ? { token } : {}) })
       });
       return await parseResponse(response);
     } catch (error) {
@@ -102,8 +95,8 @@ export const authApi = {
   login: async (username, password) => {
     return gasApi.post('login', { username, password });
   },
-  logout: async (userId) => {
-    return gasApi.post('logout', { userId });
+  logout: async () => {
+    return gasApi.post('logout', {});
   }
 };
 

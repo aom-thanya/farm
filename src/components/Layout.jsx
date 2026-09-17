@@ -44,6 +44,11 @@ export default function Layout() {
         }
       } catch (error) {
         console.error('Failed to load data:', error);
+        if (error.message === 'UNAUTHORIZED') {
+          logout();
+          navigate('/login');
+          return;
+        }
         setLoadError('โหลดข้อมูลไม่สำเร็จ โปรดลองเปิดหน้านี้อีกครั้ง');
       } finally {
         if (showLoading) setLoading(false);
@@ -65,7 +70,7 @@ export default function Layout() {
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [user, setCategories, setLoading, setTransactions]);
+  }, [user, setCategories, setLoading, setTransactions, logout, navigate]);
 
   // Close mobile menu when route changes
   useEffect(() => {
@@ -74,7 +79,7 @@ export default function Layout() {
   }, [location.pathname]);
 
   const handleLogout = () => {
-    authApi.logout(user.id).catch(error => console.error('Failed to record logout:', error));
+    authApi.logout().catch(error => console.error('Failed to record logout:', error));
     logout();
     navigate('/login');
   };

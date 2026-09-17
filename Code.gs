@@ -4,6 +4,15 @@ function getSpreadsheet() {
   return SpreadsheetApp.openById(SPREADSHEET_ID);
 }
 
+const SESSION_SECONDS = 21600;
+
+function getSession(data) {
+  const token = data && data.token;
+  if (typeof token !== 'string' || !/^[0-9a-f-]{36}$/.test(token)) return null;
+  const stored = CacheService.getScriptCache().get('session_' + token);
+  return stored ? JSON.parse(stored) : null;
+}
+
 function doPost(e) {
   try {
     const action = e.parameter.action;
@@ -16,10 +25,18 @@ function doPost(e) {
 
     if (action === 'login') {
       return handleLogin(data);
-    } else if (action === 'logout') {
-      return handleLogout(data);
+    }
+    const session = getSession(data);
+    if (!session) return respondError('UNAUTHORIZED');
+
+    if (action === 'logout') {
+      return handleLogout(session, data.token);
+    } else if (action === 'getTransactions') {
+      return getTransactions();
+    } else if (action === 'getCategories') {
+      return getCategories();
     } else if (action === 'addTransaction') {
-      return addTransaction(data);
+      return addTransaction(data, session);
     } else if (action === 'deleteTransaction') {
       return deleteTransaction(data);
     } else if (action === 'addCategory') {
@@ -40,11 +57,7 @@ function doGet(e) {
   try {
     const action = e.parameter.action;
     
-    if (action === 'getTransactions') {
-      return getTransactions();
-    } else if (action === 'getCategories') {
-      return getCategories();
-    } else if (action === 'ping') {
+    if (action === 'ping') {
       return respondSuccess({ message: "pong" });
     }
 
@@ -68,24 +81,27 @@ function handleLogin(data) {
     if (rows[i][userIndex] == data.username && rows[i][passIndex] == data.password) {
       // Update lastedLogin
       sheet.getRange(i + 1, lastedLoginIndex + 1).setValue(new Date().toISOString());
-      
+      const token = Utilities.getUuid();
+      CacheService.getScriptCache().put('session_' + token, JSON.stringify({ id: String(rows[i][idIndex]) }), SESSION_SECONDS);
       return respondSuccess({
         id: rows[i][idIndex],
-        username: rows[i][userIndex]
+        username: rows[i][userIndex],
+        token: token
       });
     }
   }
   return respondError("Username หรือ Password ไม่ถูกต้อง");
 }
 
-function handleLogout(data) {
+function handleLogout(session, token) {
+  CacheService.getScriptCache().remove('session_' + token);
   const sheet = getSpreadsheet().getSheetByName('Users');
   const rows = sheet.getDataRange().getValues();
   const idIndex = rows[0].indexOf('id');
   const lastedLogoutIndex = rows[0].indexOf('lastedLogout');
   
   for (let i = 1; i < rows.length; i++) {
-    if (rows[i][idIndex] == data.userId) {
+    if (String(rows[i][idIndex]) === session.id) {
       sheet.getRange(i + 1, lastedLogoutIndex + 1).setValue(new Date().toISOString());
       return respondSuccess({ message: "Logout successful" });
     }
@@ -93,7 +109,16 @@ function handleLogout(data) {
   return respondSuccess({ message: "User not found, but logged out" });
 }
 
-function addTransaction(data) {
+function addTransaction(data, session) {
+  const type = String(data.type || '').trim().toLowerCase();
+  const amount = Number(data.amount);
+  const unitPrice = Number(data.unit_price);
+  const quantity = Number(data.quantity);
+  if (['income', 'expense'].indexOf(type) === -1 || !Number.isFinite(amount) || amount <= 0 ||
+      !Number.isFinite(unitPrice) || unitPrice <= 0 || !Number.isFinite(quantity) || quantity <= 0 ||
+      !/^\d{4}-\d{2}-\d{2}$/.test(String(data.date || ''))) {
+    return respondError('Invalid transaction');
+  }
   const sheet = getSpreadsheet().getSheetByName('Transactions');
   const id = Utilities.getUuid();
   const createdAt = new Date().toISOString();
@@ -102,15 +127,15 @@ function addTransaction(data) {
   const values = {
     id,
     created_at: createdAt,
-    type: data.type || '',
-    user_id: data.user_id || data.userId || '',
+    type: type,
+    user_id: session.id,
     category: data.category || '',
-    amount: data.amount || 0,
+    amount: amount,
     note: data.note || '',
     date: data.date || '',
     buyer_seller: data.buyer_seller || '',
-    unit_price: data.unit_price || 0,
-    quantity: data.quantity || 1,
+    unit_price: unitPrice,
+    quantity: quantity,
     cat_type: data.cat_type || '',
     cat_name: data.cat_name || '',
     cat_emoji: data.cat_emoji || ''
@@ -159,6 +184,9 @@ function deleteTransaction(data) {
 }
 
 function addCategory(data) {
+  if (['income', 'expense'].indexOf(String(data.type || '')) === -1 || !String(data.name || '').trim()) {
+    return respondError('Invalid category');
+  }
   const sheet = getSpreadsheet().getSheetByName('Categories');
   // id, type, name, emoji, usage_count
   const id = 'custom_' + Utilities.getUuid();
@@ -262,7 +290,6 @@ function setupSheets() {
   if (!userSheet) {
     userSheet = ss.insertSheet('Users');
     userSheet.appendRow(['id', 'username', 'password', 'createAt', 'updateAt', 'lastedLogin', 'lastedLogout']);
-    userSheet.appendRow(['u1', 'admin', '1234', new Date().toISOString(), '', '', '']); // Default user
   }
   
   // Transactions Sheet

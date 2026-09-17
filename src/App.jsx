@@ -9,7 +9,7 @@ import Categories from './pages/Categories';
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
   const user = useStore(state => state.user);
-  if (!user) return <Navigate to="/login" replace />;
+  if (!user?.token) return <Navigate to="/login" replace />;
   return children;
 };
 

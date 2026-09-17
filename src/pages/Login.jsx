@@ -25,6 +25,7 @@ export default function Login() {
     try {
       const res = await authApi.login(username, password);
       if (res.success) {
+        if (!res.data?.token) throw new Error('API_VERSION_MISMATCH');
         setUser(res.data);
         navigate('/');
       } else {
@@ -35,6 +36,8 @@ export default function Login() {
     } catch (err) {
       setError(err.message === 'Username หรือ Password ไม่ถูกต้อง'
         ? 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'
+        : err.message === 'API_VERSION_MISMATCH'
+          ? 'กรุณาอัปเดต Apps Script API ก่อนเข้าสู่ระบบ'
         : 'เกิดข้อผิดพลาดในการเชื่อมต่อ');
       setLoading(false);
     }

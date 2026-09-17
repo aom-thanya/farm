@@ -50,7 +50,7 @@ describe('Login Component', () => {
   });
 
   it('handles mock login correctly', async () => {
-    authApi.login.mockResolvedValue({ success: true, data: { id: 'u1', username: 'admin' } });
+    authApi.login.mockResolvedValue({ success: true, data: { id: 'u1', username: 'admin', token: 'test-token' } });
     render(
       <BrowserRouter>
         <Login />
@@ -63,7 +63,7 @@ describe('Login Component', () => {
     fireEvent.click(screen.getByRole('button', { name: /เข้าสู่ระบบ/i }));
     
     await waitFor(() => {
-      expect(mockSetUser).toHaveBeenCalledWith({ id: 'u1', username: 'admin' });
+      expect(mockSetUser).toHaveBeenCalledWith({ id: 'u1', username: 'admin', token: 'test-token' });
     }, { timeout: 1500 }); // Mock login has a 1000ms delay
   });
 

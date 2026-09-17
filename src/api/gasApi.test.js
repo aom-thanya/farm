@@ -1,9 +1,11 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import { gasApi, transactionApi, categoryApi } from './gasApi';
+import { useStore } from '../store/useStore';
 
 describe('Google Apps Script API', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
+    useStore.setState({ user: null });
   });
 
   afterEach(() => {
@@ -23,6 +25,15 @@ describe('Google Apps Script API', () => {
   it('rejects an application error returned with HTTP 200', async () => {
     fetch.mockResolvedValue({ ok: true, json: async () => ({ success: false, error: 'Category not found' }) });
     await expect(categoryApi.deleteCategory('missing')).rejects.toThrow('Category not found');
+  });
+
+  it('sends the session token on reads and writes', async () => {
+    useStore.setState({ user: { id: 'u1', token: 'session-token' } });
+    fetch.mockResolvedValue({ ok: true, json: async () => ({ success: true, data: [] }) });
+    await transactionApi.getTransactions();
+    expect(JSON.parse(fetch.mock.calls[0][1].body).token).toBe('session-token');
+    await categoryApi.addCategory({ type: 'income', name: 'Mango' });
+    expect(JSON.parse(fetch.mock.calls[1][1].body)).toMatchObject({ token: 'session-token', name: 'Mango' });
   });
 
   it('normalizes transaction data returned by Sheets', async () => {
