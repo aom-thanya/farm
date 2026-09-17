@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import { todayDateInput } from '../lib/utils';
 
 export const useStore = create(
   persist(
@@ -8,7 +9,7 @@ export const useStore = create(
       transactions: [],
       categories: [],
       isLoading: false,
-      dateFilter: { type: 'month', date: new Date() },
+      dateFilter: { type: 'day', start: todayDateInput(), end: todayDateInput() },
       
       setDateFilter: (filter) => set({ dateFilter: filter }),
       

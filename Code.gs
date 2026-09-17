@@ -32,7 +32,7 @@ function doPost(e) {
     if (action === 'logout') {
       return handleLogout(session, data.token);
     } else if (action === 'getTransactions') {
-      return getTransactions();
+      return getTransactions(data);
     } else if (action === 'getCategories') {
       return getCategories();
     } else if (action === 'addTransaction') {
@@ -149,8 +149,14 @@ function addTransaction(data, session) {
   return respondSuccess({ id: id, message: "Transaction added successfully" });
 }
 
-function getTransactions() {
-  const sheet = getSpreadsheet().getSheetByName('Transactions');
+function getTransactions(filter) {
+  const startDate = String(filter.startDate || '');
+  const endDate = String(filter.endDate || '');
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate) {
+    return respondError('Invalid date filter');
+  }
+  const spreadsheet = getSpreadsheet();
+  const sheet = spreadsheet.getSheetByName('Transactions');
   const rows = sheet.getDataRange().getValues();
   if (rows.length < 2) return respondSuccess([]);
   
@@ -162,7 +168,18 @@ function getTransactions() {
     for (let j = 0; j < headers.length; j++) {
       rowData[headers[j]] = rows[i][j];
     }
-    result.push(rowData);
+    const isLegacyShiftedRow = ['income', 'expense'].indexOf(String(rowData.created_at).toLowerCase()) !== -1;
+    const type = isLegacyShiftedRow ? String(rowData.created_at).toLowerCase() : String(rowData.type).toLowerCase();
+    if (['income', 'expense'].indexOf(type) === -1) continue;
+    const rawDate = isLegacyShiftedRow ? rowData.amount : rowData.date;
+    const parsedDate = rawDate instanceof Date ? rawDate : new Date(rawDate);
+    if (Number.isNaN(parsedDate.getTime())) continue;
+    const date = rawDate instanceof Date
+      ? Utilities.formatDate(rawDate, spreadsheet.getSpreadsheetTimeZone(), 'yyyy-MM-dd')
+      : /^\d{4}-\d{2}-\d{2}$/.test(String(rawDate))
+        ? String(rawDate)
+        : Utilities.formatDate(parsedDate, spreadsheet.getSpreadsheetTimeZone(), 'yyyy-MM-dd');
+    if (date >= startDate && date <= endDate) result.push(rowData);
   }
   return respondSuccess(result);
 }

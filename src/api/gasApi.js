@@ -100,8 +100,9 @@ export const authApi = {
 };
 
 export const transactionApi = {
-  getTransactions: async () => {
-    const response = await gasApi.get('getTransactions');
+  getTransactions: async (range) => {
+    if (!range?.startDate || !range?.endDate) throw new Error('A date range is required');
+    const response = await gasApi.get('getTransactions', range);
     return {
       ...response,
       data: Array.isArray(response.data)

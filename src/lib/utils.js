@@ -38,6 +38,25 @@ export function transactionDateKey(value) {
   return `${date.year}-${date.month}-${date.day}`;
 }
 
+export function transactionFilterRange(filter) {
+  if (filter.type === 'day') {
+    if (!filter.start || !filter.end || filter.start > filter.end) return null;
+    return { startDate: filter.start, endDate: filter.end };
+  }
+  if (filter.type === 'month') {
+    const date = parseCalendarDate(filter.date);
+    if (Number.isNaN(date.getTime())) return null;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const lastDay = String(new Date(year, date.getMonth() + 1, 0).getDate()).padStart(2, '0');
+    return { startDate: `${year}-${month}-01`, endDate: `${year}-${month}-${lastDay}` };
+  }
+  if (filter.type === 'year' && Number.isInteger(filter.year)) {
+    return { startDate: `${filter.year}-01-01`, endDate: `${filter.year}-12-31` };
+  }
+  return null;
+}
+
 export function formatDate(dateStr) {
   if (!dateStr) return '';
   const date = parseCalendarDate(dateStr);

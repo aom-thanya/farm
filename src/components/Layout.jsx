@@ -1,7 +1,7 @@
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import { Home, List, Settings, LogOut, ChevronLeft, ChevronRight, Plus, Menu } from 'lucide-react';
 import { useStore } from '../store/useStore';
-import { cn, todayDateInput } from '../lib/utils';
+import { cn, todayDateInput, transactionFilterRange } from '../lib/utils';
 import { useState, useEffect } from 'react';
 import { format, addMonths, subMonths } from 'date-fns';
 import { th } from 'date-fns/locale';
@@ -27,15 +27,24 @@ export default function Layout() {
 
   useEffect(() => {
     if (!user) return;
+    let cancelled = false;
     
     const loadData = async (showLoading = true) => {
       if (showLoading) setLoading(true);
       setLoadError('');
+      const range = transactionFilterRange(dateFilter);
+      if (!range) {
+        setTransactions([]);
+        setLoadError('กรุณาเลือกช่วงวันที่ให้ถูกต้อง');
+        if (showLoading) setLoading(false);
+        return;
+      }
       try {
         const [txRes, catRes] = await Promise.all([
-          transactionApi.getTransactions(),
+          transactionApi.getTransactions(range),
           categoryApi.getCategories()
         ]);
+        if (cancelled) return;
         if (txRes.success) {
           setTransactions(txRes.data);
         }
@@ -43,15 +52,17 @@ export default function Layout() {
           setCategories(catRes.data);
         }
       } catch (error) {
+        if (cancelled) return;
         console.error('Failed to load data:', error);
         if (error.message === 'UNAUTHORIZED') {
           logout();
           navigate('/login');
           return;
         }
+        setTransactions([]);
         setLoadError('โหลดข้อมูลไม่สำเร็จ โปรดลองเปิดหน้านี้อีกครั้ง');
       } finally {
-        if (showLoading) setLoading(false);
+        if (showLoading && !cancelled) setLoading(false);
       }
     };
     
@@ -67,10 +78,11 @@ export default function Layout() {
     window.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      cancelled = true;
       window.removeEventListener('focus', handleFocus);
       window.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [user, setCategories, setLoading, setTransactions, logout, navigate]);
+  }, [user, dateFilter, setCategories, setLoading, setTransactions, logout, navigate]);
 
   // Close mobile menu when route changes
   useEffect(() => {
@@ -209,8 +221,20 @@ export default function Layout() {
           <div className="flex flex-col md:flex-row justify-between items-center mb-6 gap-4">
             {/* Month Selector & View Toggle */}
             <div className="flex flex-col items-center gap-4 w-full md:w-auto">
-              {/* Toggle Switch */}
+              {/* Filter granularity */}
               <div className="flex bg-gray-200/80 p-1.5 rounded-2xl w-full md:w-[320px]">
+                <button 
+                  onClick={() => {
+                    const today = todayDateInput();
+                    setDateFilter({ type: 'day', start: today, end: today });
+                  }}
+                  className={cn(
+                    "flex-1 py-2.5 rounded-xl font-bold text-sm transition-all", 
+                    dateFilter.type === 'day' ? "bg-white text-farm-700 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                  )}
+                >
+                  วัน
+                </button>
                 <button 
                   onClick={() => setDateFilter({ type: 'month', date: new Date() })}
                   className={cn(
@@ -218,28 +242,16 @@ export default function Layout() {
                     dateFilter.type === 'month' ? "bg-white text-farm-700 shadow-sm" : "text-gray-500 hover:text-gray-700"
                   )}
                 >
-                  รายเดือน
+                  เดือน
                 </button>
                 <button 
-                  onClick={() => {
-                    const today = todayDateInput();
-                    setDateFilter({ type: 'range', start: today, end: today });
-                  }}
+                  onClick={() => setDateFilter({ type: 'year', year: new Date().getFullYear() })}
                   className={cn(
                     "flex-1 py-2.5 rounded-xl font-bold text-sm transition-all", 
-                    dateFilter.type === 'range' ? "bg-white text-farm-700 shadow-sm" : "text-gray-500 hover:text-gray-700"
+                    dateFilter.type === 'year' ? "bg-white text-farm-700 shadow-sm" : "text-gray-500 hover:text-gray-700"
                   )}
                 >
-                  ช่วงวันที่
-                </button>
-                <button 
-                  onClick={() => setDateFilter({ type: 'all' })}
-                  className={cn(
-                    "flex-1 py-2.5 rounded-xl font-bold text-sm transition-all", 
-                    dateFilter.type === 'all' ? "bg-white text-farm-700 shadow-sm" : "text-gray-500 hover:text-gray-700"
-                  )}
-                >
-                  ทั้งหมด
+                  ปี
                 </button>
               </div>
 
@@ -266,8 +278,8 @@ export default function Layout() {
                 </div>
               )}
 
-              {/* Date Range Selector */}
-              {dateFilter.type === 'range' && (
+              {/* Day or date range selector */}
+              {dateFilter.type === 'day' && (
                 <div className="flex items-center gap-2 w-full md:w-auto animate-in fade-in slide-in-from-top-2 duration-300 bg-white p-2 rounded-2xl shadow-sm md:shadow-none md:bg-transparent md:p-0">
                   <input 
                     type="date"
@@ -282,6 +294,18 @@ export default function Layout() {
                     onChange={(e) => setDateFilter({ ...dateFilter, end: e.target.value })}
                     className="bg-gray-50 border border-gray-200 rounded-xl p-2 text-sm font-bold text-gray-700 outline-none focus:border-farm-500 w-full"
                   />
+                </div>
+              )}
+
+              {dateFilter.type === 'year' && (
+                <div className="flex items-center justify-between w-full md:w-auto md:gap-4 bg-white md:bg-transparent rounded-2xl p-2 md:p-0 shadow-sm md:shadow-none">
+                  <button onClick={() => setDateFilter({ type: 'year', year: dateFilter.year - 1 })} className="p-3 bg-gray-50 rounded-xl hover:bg-gray-100 text-gray-500" aria-label="ปีก่อนหน้า">
+                    <ChevronLeft className="w-6 h-6" />
+                  </button>
+                  <h2 className="text-xl md:text-2xl font-heading font-bold px-4 text-center text-gray-800 flex-1 min-w-[160px]">ปี {dateFilter.year + 543}</h2>
+                  <button onClick={() => setDateFilter({ type: 'year', year: dateFilter.year + 1 })} className="p-3 bg-gray-50 rounded-xl hover:bg-gray-100 text-gray-500" aria-label="ปีถัดไป">
+                    <ChevronRight className="w-6 h-6" />
+                  </button>
                 </div>
               )}
             </div>
