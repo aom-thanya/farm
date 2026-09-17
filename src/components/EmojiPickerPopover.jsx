@@ -58,7 +58,7 @@ export default function EmojiPickerPopover({ type, selectedEmoji, onSelect, onCl
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50">
+    <div className="fixed inset-0 z-[150] flex items-center justify-center p-4 bg-black/50">
       <div 
         ref={popoverRef}
         className="bg-white rounded-3xl shadow-xl w-full max-w-sm max-h-[85vh] flex flex-col overflow-hidden animate-in fade-in zoom-in duration-200"

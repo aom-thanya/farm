@@ -3,6 +3,7 @@ import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
 import { Save, Loader2 } from 'lucide-react';
 import Modal from './Modal';
+import EmojiPickerPopover from './EmojiPickerPopover';
 import { transactionApi, categoryApi } from '../api/gasApi';
 
 export default function AddTransactionModal({ isOpen, onClose, type }) {
@@ -11,6 +12,13 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
   const [step, setStep] = useState(1); // 1 = Select Category, 2 = Fill Form
   const [selectedCategory, setSelectedCategory] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isAddingCategory, setIsAddingCategory] = useState(false);
+  const [categoryName, setCategoryName] = useState('');
+  const [categoryEmoji, setCategoryEmoji] = useState('🌟');
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [isSavingCategory, setIsSavingCategory] = useState(false);
+  const [categoryError, setCategoryError] = useState('');
+  const [toast, setToast] = useState('');
   
   // Form State
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
@@ -22,6 +30,7 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
   const categories = useStore(state => state.categories);
   const user = useStore(state => state.user);
   const addTransaction = useStore(state => state.addTransaction);
+  const addCategory = useStore(state => state.addCategory);
   const setTransactions = useStore(state => state.setTransactions);
   const setCategories = useStore(state => state.setCategories);
   
@@ -42,12 +51,46 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
       setQuantity('1');
       setPerson('');
       setNote('');
+      setIsAddingCategory(false);
+      setCategoryName('');
+      setCategoryEmoji('🌟');
+      setCategoryError('');
     }
   }, [isOpen]);
+
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timeout = window.setTimeout(() => setToast(''), 3500);
+    return () => window.clearTimeout(timeout);
+  }, [toast]);
 
   const filteredCategories = categories.filter(c => c.type === type);
 
   if (!isOpen || !type) return null;
+
+  const handleCreateCategory = async (event) => {
+    event.preventDefault();
+    const name = categoryName.trim();
+    if (!name || isSavingCategory) return;
+
+    setIsSavingCategory(true);
+    setCategoryError('');
+    try {
+      const category = { type, name, emoji: categoryEmoji };
+      const response = await categoryApi.addCategory(category);
+      if (!response.data?.id) throw new Error('API did not return a category ID');
+      const savedCategory = { ...category, id: String(response.data.id), usage_count: 0 };
+      addCategory(savedCategory);
+      setSelectedCategory(savedCategory);
+      setStep(2);
+      setIsAddingCategory(false);
+      setToast('เพิ่มหมวดหมู่สำเร็จ');
+    } catch (error) {
+      setCategoryError(error.message || 'บันทึกหมวดหมู่ไม่สำเร็จ');
+    } finally {
+      setIsSavingCategory(false);
+    }
+  };
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -110,6 +153,50 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
   );
 
   return (
+    <>
+    {isAddingCategory ? (
+      <Modal isOpen={isOpen} onClose={() => setIsAddingCategory(false)} title="เพิ่มหมวดหมู่ใหม่" className="max-w-lg">
+        <form onSubmit={handleCreateCategory} className="space-y-5">
+          {categoryError && <p role="alert" className="text-red-600">{categoryError}</p>}
+          <div>
+            <label className="label-text" htmlFor="new-category-emoji">Emoji</label>
+            <button
+              id="new-category-emoji"
+              type="button"
+              onClick={() => setShowEmojiPicker(true)}
+              className="input-field w-20 h-16 text-3xl flex items-center justify-center"
+              aria-label="เลือก Emoji"
+            >
+              {categoryEmoji}
+            </button>
+            {showEmojiPicker && (
+              <EmojiPickerPopover
+                type={type}
+                selectedEmoji={categoryEmoji}
+                onSelect={setCategoryEmoji}
+                onClose={() => setShowEmojiPicker(false)}
+              />
+            )}
+          </div>
+          <div>
+            <label className="label-text" htmlFor="new-category-name">ชื่อหมวดหมู่</label>
+            <input
+              id="new-category-name"
+              type="text"
+              required
+              value={categoryName}
+              onChange={event => setCategoryName(event.target.value)}
+              className="input-field"
+              placeholder="เช่น มะม่วง, ค่าไฟ"
+            />
+          </div>
+          <button type="submit" disabled={isSavingCategory} className="btn-primary w-full flex items-center justify-center gap-2">
+            {isSavingCategory && <Loader2 className="w-5 h-5 animate-spin" />}
+            บันทึก
+          </button>
+        </form>
+      </Modal>
+    ) : (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
       {step === 1 ? (
         <div className="space-y-6">
@@ -134,11 +221,10 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
           </div>
           <button
             onClick={() => {
-              // Usually would navigate to categories page, or show inline form
-              onClose();
-              window.location.hash = '#/categories'; 
-              // Note: our app uses BrowserRouter, so navigate needs to be used if we want to change route.
-              // We can just close and user can go there manually.
+              setCategoryName('');
+              setCategoryEmoji('🌟');
+              setCategoryError('');
+              setIsAddingCategory(true);
             }}
             className={cn(
               "w-full py-4 rounded-2xl border-2 border-dashed font-bold text-xl flex items-center justify-center gap-2 transition-colors",
@@ -254,5 +340,8 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
         </form>
       )}
     </Modal>
+    )}
+    {toast && <div role="status" className="fixed bottom-6 right-6 z-[200] rounded-2xl bg-farm-700 px-5 py-3 font-bold text-white shadow-xl">{toast}</div>}
+    </>
   );
 }

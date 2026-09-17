@@ -1,0 +1,46 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import AddTransactionModal from './AddTransactionModal';
+import { categoryApi } from '../api/gasApi';
+import { useStore } from '../store/useStore';
+
+vi.mock('../api/gasApi', () => ({
+  categoryApi: { addCategory: vi.fn() },
+  transactionApi: { addTransaction: vi.fn(), getTransactions: vi.fn() }
+}));
+
+describe('Create category from transaction modal', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useStore.setState({ user: { id: 'u1', token: 'token' }, categories: [], transactions: [] });
+  });
+
+  it.each(['income', 'expense'])('opens a modal and saves a new %s category', async type => {
+    categoryApi.addCategory.mockResolvedValue({ success: true, data: { id: 'new-category-id' } });
+    render(<AddTransactionModal isOpen onClose={vi.fn()} type={type} />);
+
+    fireEvent.click(screen.getByRole('button', { name: `+ กรอกประเภทราย${type === 'income' ? 'รับ' : 'จ่าย'}ใหม่` }));
+    expect(screen.getByText('เพิ่มหมวดหมู่ใหม่')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'เลือก Emoji' })).toHaveTextContent('🌟');
+
+    fireEvent.change(screen.getByLabelText('ชื่อหมวดหมู่'), { target: { value: 'มะม่วง' } });
+    fireEvent.click(screen.getByRole('button', { name: 'บันทึก' }));
+
+    await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('เพิ่มหมวดหมู่สำเร็จ'));
+    expect(categoryApi.addCategory).toHaveBeenCalledWith({ type, name: 'มะม่วง', emoji: '🌟' });
+    expect(useStore.getState().categories).toContainEqual({ id: 'new-category-id', type, name: 'มะม่วง', emoji: '🌟', usage_count: 0 });
+    expect(screen.getByText('มะม่วง')).toBeInTheDocument();
+  });
+
+  it('keeps the form open when the API rejects the save', async () => {
+    categoryApi.addCategory.mockRejectedValue(new Error('Save failed'));
+    render(<AddTransactionModal isOpen onClose={vi.fn()} type="income" />);
+    fireEvent.click(screen.getByRole('button', { name: '+ กรอกประเภทรายรับใหม่' }));
+    fireEvent.change(screen.getByLabelText('ชื่อหมวดหมู่'), { target: { value: 'มะม่วง' } });
+    fireEvent.click(screen.getByRole('button', { name: 'บันทึก' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('Save failed');
+    expect(screen.getByText('เพิ่มหมวดหมู่ใหม่')).toBeInTheDocument();
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+});
