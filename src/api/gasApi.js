@@ -1,6 +1,6 @@
 // API Layer for Google Apps Script
 // Users need to replace this URL with their own deployed Apps Script Web App URL
-const API_URL = import.meta.env.API_URL;
+const API_URL = import.meta.env.VITE_API_URL;
 
 export const gasApi = {
   async get(action, params = {}) {
