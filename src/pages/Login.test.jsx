@@ -1,0 +1,81 @@
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
+import Login from './Login';
+import { BrowserRouter } from 'react-router-dom';
+import { useStore } from '../store/useStore';
+
+// Mock zustand store
+vi.mock('../store/useStore', () => ({
+  useStore: vi.fn(),
+}));
+
+const mockSetUser = vi.fn();
+
+describe('Login Component', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    useStore.mockImplementation((selector) => {
+      // Return mockSetUser when the component selects state.setUser
+      return mockSetUser;
+    });
+  });
+
+  it('renders login form correctly', () => {
+    render(
+      <BrowserRouter>
+        <Login />
+      </BrowserRouter>
+    );
+    
+    expect(screen.getByText('Farm Money')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('กรอกชื่อผู้ใช้...')).toBeInTheDocument();
+    expect(screen.getByPlaceholderText('กรอกรหัสผ่าน...')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /เข้าสู่ระบบ/i })).toBeInTheDocument();
+  });
+
+  it('shows error when submitting empty form', async () => {
+    render(
+      <BrowserRouter>
+        <Login />
+      </BrowserRouter>
+    );
+    
+    fireEvent.click(screen.getByRole('button', { name: /เข้าสู่ระบบ/i }));
+    
+    expect(screen.getByText('กรุณากรอกชื่อผู้ใช้และรหัสผ่าน')).toBeInTheDocument();
+  });
+
+  it('handles mock login correctly', async () => {
+    render(
+      <BrowserRouter>
+        <Login />
+      </BrowserRouter>
+    );
+    
+    fireEvent.change(screen.getByPlaceholderText('กรอกชื่อผู้ใช้...'), { target: { value: 'admin' } });
+    fireEvent.change(screen.getByPlaceholderText('กรอกรหัสผ่าน...'), { target: { value: '1234' } });
+    
+    fireEvent.click(screen.getByRole('button', { name: /เข้าสู่ระบบ/i }));
+    
+    await waitFor(() => {
+      expect(mockSetUser).toHaveBeenCalledWith({ id: 'u1', username: 'admin' });
+    }, { timeout: 1500 }); // Mock login has a 1000ms delay
+  });
+
+  it('shows error on invalid credentials', async () => {
+    render(
+      <BrowserRouter>
+        <Login />
+      </BrowserRouter>
+    );
+    
+    fireEvent.change(screen.getByPlaceholderText('กรอกชื่อผู้ใช้...'), { target: { value: 'wrong' } });
+    fireEvent.change(screen.getByPlaceholderText('กรอกรหัสผ่าน...'), { target: { value: 'pass' } });
+    
+    fireEvent.click(screen.getByRole('button', { name: /เข้าสู่ระบบ/i }));
+    
+    await waitFor(() => {
+      expect(screen.getByText('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง')).toBeInTheDocument();
+    }, { timeout: 1500 });
+  });
+});

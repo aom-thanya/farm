@@ -1,0 +1,194 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Bai Jamjuree", sans-serif;
+  --font-heading: "Bai Jamjuree", sans-serif;
+
+  --color-farm-50: #f0fdf4;
+  --color-farm-100: #dcfce7;
+  --color-farm-200: #bbf7d0;
+  --color-farm-300: #86efac;
+  --color-farm-400: #4ade80;
+  --color-farm-500: #22c55e;
+  --color-farm-600: #16a34a;
+  --color-farm-700: #15803d;
+  --color-farm-800: #166534;
+  --color-farm-900: #14532d;
+}
+
+@layer base {
+  html {
+    font-size: 16px;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    @apply min-h-screen font-sans bg-farm-50 text-lg leading-relaxed text-gray-900;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    @apply font-heading font-bold text-gray-900;
+  }
+
+  h1 {
+    @apply text-3xl leading-tight;
+  }
+
+  h2 {
+    @apply text-2xl leading-tight;
+  }
+
+  h3 {
+    @apply text-xl leading-snug;
+  }
+
+  button,
+  a {
+    @apply cursor-pointer;
+  }
+
+  button:disabled,
+  input:disabled,
+  select:disabled,
+  textarea:disabled {
+    @apply cursor-not-allowed opacity-60;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+
+  :focus-visible {
+    @apply outline-none ring-4 ring-farm-300 ring-offset-2;
+  }
+
+  ::selection {
+    @apply bg-farm-200 text-farm-900;
+  }
+}
+
+@layer components {
+  .btn-primary {
+    @apply flex w-full min-h-14 items-center justify-center gap-2 rounded-2xl bg-farm-700 px-6 py-4 text-xl font-bold text-white shadow-md transition-colors hover:bg-farm-800 active:bg-farm-900 focus-visible:ring-4 focus-visible:ring-farm-300 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:bg-gray-400;
+  }
+
+  .btn-outline {
+    @apply flex w-full min-h-14 items-center justify-center gap-2 rounded-2xl border-2 border-farm-700 bg-white px-6 py-4 text-xl font-bold text-farm-800 transition-colors hover:bg-farm-100 active:bg-farm-200 focus-visible:ring-4 focus-visible:ring-farm-300 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:border-gray-400 disabled:text-gray-500;
+  }
+
+  .btn-danger {
+    @apply flex w-full min-h-14 items-center justify-center gap-2 rounded-2xl bg-red-700 px-6 py-4 text-xl font-bold text-white shadow-md transition-colors hover:bg-red-800 active:bg-red-900 focus-visible:ring-4 focus-visible:ring-red-300 focus-visible:ring-offset-2 disabled:pointer-events-none disabled:bg-gray-400;
+  }
+
+  .card {
+    @apply rounded-3xl border-2 border-gray-300 bg-white p-6 shadow-sm;
+  }
+
+  .input-field {
+    @apply w-full min-h-14 rounded-2xl border-2 border-gray-400 bg-white p-4 text-xl text-gray-900 placeholder:text-gray-600 outline-none transition-all hover:border-gray-500 focus:border-farm-700 focus:ring-4 focus:ring-farm-200 disabled:bg-gray-100 disabled:text-gray-600;
+  }
+
+  .label-text {
+    @apply mb-2 block text-xl font-semibold text-gray-800;
+  }
+
+  .helper-text {
+    @apply mt-2 text-lg leading-relaxed text-gray-700;
+  }
+
+  .error-text {
+    @apply mt-2 text-lg font-medium text-red-700;
+  }
+
+  .input-error {
+    @apply border-red-700 focus:border-red-700 focus:ring-red-200;
+  }
+
+  .category-item {
+    @apply flex min-h-16 items-center gap-3 rounded-2xl border-2 border-gray-300 bg-white p-4 text-xl font-semibold text-gray-900 transition-colors hover:border-farm-700 hover:bg-farm-50 focus-visible:ring-4 focus-visible:ring-farm-300 focus-visible:ring-offset-2;
+  }
+
+  .category-item-selected {
+    @apply border-farm-800 bg-farm-100 text-farm-900;
+  }
+
+  .tab-button {
+    @apply flex min-h-14 flex-1 items-center justify-center rounded-xl px-5 py-3 text-xl font-bold text-gray-700 transition-colors hover:bg-gray-100 focus-visible:ring-4 focus-visible:ring-farm-300 focus-visible:ring-offset-2;
+  }
+
+  .tab-button-active {
+    @apply bg-farm-100 text-farm-900;
+  }
+
+  .alert-success {
+    @apply rounded-2xl border-2 border-farm-700 bg-farm-50 p-4 text-lg font-medium text-farm-900;
+  }
+
+  .alert-error {
+    @apply rounded-2xl border-2 border-red-700 bg-red-50 p-4 text-lg font-medium text-red-900;
+  }
+}
+
+/* Scrollbar ขนาดใหญ่และมี Contrast ชัดเจน */
+::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f0fdf4;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #15803d;
+  border: 3px solid #f0fdf4;
+  border-radius: 8px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #166534;
+}
+
+/* รองรับ Firefox */
+* {
+  scrollbar-width: auto;
+  scrollbar-color: #15803d #f0fdf4;
+}
+
+/* ลด Animation สำหรับผู้ใช้ที่เปิด Reduce Motion */
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+}
+
+/* เพิ่ม Contrast เมื่อผู้ใช้ตั้งค่าให้ระบบแสดงผลชัดขึ้น */
+@media (prefers-contrast: more) {
+
+  .card,
+  .input-field,
+  .category-item {
+    @apply border-gray-700;
+  }
+
+  .btn-outline {
+    @apply border-farm-900 text-farm-900;
+  }
+}
