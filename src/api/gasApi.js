@@ -38,6 +38,15 @@ const normalizeTransaction = (transaction) => {
   };
 };
 
+const normalizeCategory = (category) => ({
+  ...category,
+  id: String(category.id || ''),
+  type: String(category.type ?? category.cat_type ?? '').trim().toLowerCase(),
+  name: String(category.name ?? category.cat_name ?? '').trim(),
+  emoji: String(category.emoji ?? category.cat_emoji ?? '').trim(),
+  usage_count: Number(category.usage_count) || 0
+});
+
 export const gasApi = {
   async get(action, params = {}) {
     const url = new URL(API_URL);
@@ -108,10 +117,21 @@ export const transactionApi = {
 
 export const categoryApi = {
   getCategories: async () => {
-    return gasApi.get('getCategories');
+    const response = await gasApi.get('getCategories');
+    return {
+      ...response,
+      data: Array.isArray(response.data)
+        ? response.data.map(normalizeCategory).filter(category =>
+            ['income', 'expense'].includes(category.type)
+          )
+        : []
+    };
   },
   addCategory: async (data) => {
     return gasApi.post('addCategory', data);
+  },
+  updateCategory: async (data) => {
+    return gasApi.post('updateCategory', data);
   },
   deleteCategory: async (id) => {
     return gasApi.post('deleteCategory', { id });

@@ -56,6 +56,21 @@ describe('useStore', () => {
     expect(useStore.getState().transactions).toEqual([{ id: 'tx-2' }]);
   });
 
+  it('updateCategory updates category details without dropping usage count', () => {
+    useStore.setState({
+      categories: [{ id: 'income_1', type: 'income', name: 'ตะไคร้', emoji: '🌱', usage_count: 6 }]
+    });
+    useStore.getState().updateCategory({
+      id: 'income_1',
+      name: 'ตะไคร้อ่อน',
+      emoji: '🌿'
+    });
+
+    expect(useStore.getState().categories).toEqual([
+      { id: 'income_1', type: 'income', name: 'ตะไคร้อ่อน', emoji: '🌿', usage_count: 6 }
+    ]);
+  });
+
   it('setLoading updates loading state', () => {
     useStore.getState().setLoading(true);
     expect(useStore.getState().isLoading).toBe(true);

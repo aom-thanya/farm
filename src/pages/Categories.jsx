@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useStore } from '../store/useStore';
 import { cn } from '../lib/utils';
-import { Trash2, Plus } from 'lucide-react';
+import { Trash2, Plus, Pencil } from 'lucide-react';
 import { categoryApi } from '../api/gasApi';
 import EmojiPickerPopover from '../components/EmojiPickerPopover';
 
@@ -9,6 +9,7 @@ export default function Categories() {
   const [activeTab, setActiveTab] = useState('income');
   const categories = useStore(state => state.categories);
   const addCategory = useStore(state => state.addCategory);
+  const updateCategory = useStore(state => state.updateCategory);
   const removeCategory = useStore(state => state.removeCategory);
   const isLoading = useStore(state => state.isLoading);
   
@@ -16,6 +17,7 @@ export default function Categories() {
   const [newName, setNewName] = useState('');
   const [newEmoji, setNewEmoji] = useState('🌟');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
 
   if (isLoading) {
     return (
@@ -35,9 +37,26 @@ export default function Categories() {
 
   const filteredCategories = categories.filter(c => c.type === activeTab);
 
-  const handleAddCategory = (e) => {
+  const handleAddCategory = async (e) => {
     e.preventDefault();
     if (!newName) return;
+
+    if (editingCategory) {
+      const updatedCategory = {
+        ...editingCategory,
+        type: activeTab,
+        name: newName,
+        emoji: newEmoji
+      };
+      const response = await categoryApi.updateCategory(updatedCategory);
+      if (response.success) {
+        updateCategory(updatedCategory);
+        setEditingCategory(null);
+        setNewName('');
+        setShowAdd(false);
+      }
+      return;
+    }
     
     const newCat = {
       id: `custom_${activeTab}_${Date.now()}`,
@@ -51,6 +70,14 @@ export default function Categories() {
     setShowAdd(false);
     
     // In real app: categoryApi.addCategory(newCat);
+  };
+
+  const handleEdit = (category) => {
+    setEditingCategory(category);
+    setNewName(category.name);
+    setNewEmoji(category.emoji);
+    setActiveTab(category.type);
+    setShowAdd(true);
   };
 
   const handleDelete = (id) => {
@@ -88,7 +115,9 @@ export default function Categories() {
       <div className="card space-y-4">
         {showAdd ? (
           <form onSubmit={handleAddCategory} className="bg-gray-50 p-4 rounded-2xl border-2 border-farm-200 mb-6">
-            <h3 className="font-bold text-lg mb-4">เพิ่มหมวดหมู่ใหม่</h3>
+            <h3 className="font-bold text-lg mb-4">
+              {editingCategory ? 'แก้ไขหมวดหมู่' : 'เพิ่มหมวดหมู่ใหม่'}
+            </h3>
             <div className="flex gap-4">
               <div className="w-20 relative">
                 <label className="label-text text-sm">Emoji</label>
@@ -128,7 +157,11 @@ export default function Categories() {
               </button>
               <button 
                 type="button" 
-                onClick={() => setShowAdd(false)}
+                onClick={() => {
+                  setEditingCategory(null);
+                  setNewName('');
+                  setShowAdd(false);
+                }}
                 className="btn-outline py-2 flex-1 text-base"
               >
                 ยกเลิก
@@ -152,6 +185,13 @@ export default function Categories() {
                 <span className="text-4xl mb-2">{cat.emoji}</span>
                 <span className="text-lg font-medium text-center">{cat.name}</span>
               </div>
+              <button 
+                onClick={() => handleEdit(cat)}
+                className="absolute -top-2 -left-2 bg-farm-600 text-white p-2 rounded-full shadow-md hover:bg-farm-700 transition-colors"
+                aria-label={`แก้ไข ${cat.name}`}
+              >
+                <Pencil className="w-4 h-4" />
+              </button>
               <button 
                 onClick={() => handleDelete(cat.id)}
                 className="absolute -top-2 -right-2 bg-red-500 text-white p-2 rounded-full shadow-md hover:bg-red-600 transition-colors"

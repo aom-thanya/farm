@@ -24,6 +24,8 @@ function doPost(e) {
       return deleteTransaction(data);
     } else if (action === 'addCategory') {
       return addCategory(data);
+    } else if (action === 'updateCategory') {
+      return updateCategory(data);
     } else if (action === 'deleteCategory') {
       return deleteCategory(data);
     }
@@ -170,6 +172,27 @@ function addCategory(data) {
   ]);
   
   return respondSuccess({ id: id, message: "Category added successfully" });
+}
+
+function updateCategory(data) {
+  const sheet = getSpreadsheet().getSheetByName('Categories');
+  const rows = sheet.getDataRange().getValues();
+  const headers = rows[0];
+  const idIndex = headers.indexOf('id');
+
+  for (let i = 1; i < rows.length; i++) {
+    if (String(rows[i][idIndex]) === String(data.id)) {
+      ['type', 'name', 'emoji'].forEach(field => {
+        const fieldIndex = headers.indexOf(field);
+        if (fieldIndex !== -1 && data[field] !== undefined) {
+          sheet.getRange(i + 1, fieldIndex + 1).setValue(data[field]);
+        }
+      });
+      return respondSuccess({ message: "Category updated successfully" });
+    }
+  }
+
+  return respondError("Category not found");
 }
 
 function getCategories() {

@@ -27,6 +27,13 @@ export const useStore = create(
       addCategory: (category) => set((state) => ({
         categories: [...state.categories, category]
       })),
+      updateCategory: (category) => set((state) => ({
+        categories: state.categories.map(currentCategory =>
+          String(currentCategory.id) === String(category.id)
+            ? { ...currentCategory, ...category }
+            : currentCategory
+        )
+      })),
       removeCategory: (id) => set((state) => ({
         categories: state.categories.filter(c => c.id !== id)
       })),
