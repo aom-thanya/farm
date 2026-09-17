@@ -23,28 +23,14 @@ export default function Login() {
     setError('');
     
     try {
-      // NOTE: Using a fake login timeout if API is not yet set up
-      // In real scenario, uncomment authApi call below:
-      /*
       const res = await authApi.login(username, password);
       if (res.success) {
         setUser(res.data);
         navigate('/');
       } else {
-        setError(res.error || 'เข้าสู่ระบบไม่สำเร็จ');
+        setError(res.error || 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
       }
-      */
-      
-      // Temporary mock login for development
-      setTimeout(() => {
-        if (username === 'admin' && password === '1234') {
-          setUser({ id: 'u1', username: 'admin' });
-          navigate('/');
-        } else {
-          setError('ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง');
-        }
-        setLoading(false);
-      }, 1000);
+      setLoading(false);
       
     } catch (err) {
       setError('เกิดข้อผิดพลาดในการเชื่อมต่อ');
