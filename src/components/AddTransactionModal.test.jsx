@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import AddTransactionModal from './AddTransactionModal';
-import { categoryApi } from '../api/gasApi';
+import { categoryApi, transactionApi } from '../api/gasApi';
 import { useStore } from '../store/useStore';
 
 vi.mock('../api/gasApi', () => ({
@@ -13,6 +13,24 @@ describe('Create category from transaction modal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     useStore.setState({ user: { id: 'u1', token: 'token' }, categories: [], transactions: [] });
+  });
+
+  it('updates a saved transaction locally without reading both datasets again', async () => {
+    useStore.setState({
+      categories: [{ id: 'c1', type: 'income', name: 'Mango', emoji: '🥭', usage_count: 2 }],
+      dateFilter: { type: 'day', start: '2000-01-01', end: '2099-12-31' }
+    });
+    transactionApi.addTransaction.mockResolvedValue({ success: true, data: { id: 'tx-new' } });
+    const onClose = vi.fn();
+    render(<AddTransactionModal isOpen onClose={onClose} type="income" />);
+    fireEvent.click(screen.getByText('Mango'));
+    fireEvent.change(screen.getByPlaceholderText('0'), { target: { value: '10' } });
+    fireEvent.click(screen.getByRole('button', { name: 'บันทึก' }));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(transactionApi.addTransaction).toHaveBeenCalledTimes(1);
+    expect(transactionApi.getTransactions).not.toHaveBeenCalled();
+    expect(useStore.getState().transactions).toContainEqual(expect.objectContaining({ id: 'tx-new', amount: 10 }));
+    expect(useStore.getState().categories[0].usage_count).toBe(3);
   });
 
   it.each(['income', 'expense'])('opens a modal and saves a new %s category', async type => {

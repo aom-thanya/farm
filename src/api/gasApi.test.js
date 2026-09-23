@@ -1,16 +1,82 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import { gasApi, transactionApi, categoryApi } from './gasApi';
+import { gasApi, transactionApi, categoryApi, appDataApi } from './gasApi';
 import { useStore } from '../store/useStore';
 
 describe('Google Apps Script API', () => {
   const range = { startDate: '2026-09-17', endDate: '2026-09-17' };
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn());
+    useStore.setState({ user: { token: 'reset-cache' } });
     useStore.setState({ user: null });
   });
 
   afterEach(() => {
+    vi.restoreAllMocks();
     vi.unstubAllGlobals();
+  });
+
+  const respond = data => ({ ok: true, json: async () => ({ success: true, data }) });
+
+  it('shares simultaneous reads and reuses results for 30 seconds', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(1000);
+    fetch.mockResolvedValue(respond([]));
+    await Promise.all([transactionApi.getTransactions(range), transactionApi.getTransactions(range)]);
+    await transactionApi.getTransactions(range);
+    expect(fetch).toHaveBeenCalledTimes(1);
+    now.mockReturnValue(31000);
+    await transactionApi.getTransactions(range);
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('fetches again after a write or session change', async () => {
+    fetch.mockResolvedValue(respond([]));
+    await categoryApi.getCategories();
+    await categoryApi.addCategory({ type: 'income', name: 'Mango' });
+    await categoryApi.getCategories();
+    expect(fetch).toHaveBeenCalledTimes(3);
+    useStore.getState().setUser({ token: 'another-session' });
+    await categoryApi.getCategories();
+    expect(fetch).toHaveBeenCalledTimes(4);
+  });
+
+  it('does not cache failed reads', async () => {
+    fetch.mockRejectedValueOnce(new Error('offline')).mockResolvedValue(respond([]));
+    await expect(categoryApi.getCategories()).rejects.toThrow('offline');
+    await categoryApi.getCategories();
+    expect(fetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not repopulate the cache with reads started before a write', async () => {
+    let finishRead;
+    fetch.mockImplementationOnce(() => new Promise(resolve => { finishRead = resolve; }));
+    const oldRead = categoryApi.getCategories();
+    fetch.mockResolvedValue(respond([]));
+    await categoryApi.addCategory({ type: 'income', name: 'Mango' });
+    finishRead(respond([]));
+    await oldRead;
+    await categoryApi.getCategories();
+    expect(fetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('loads and normalizes both datasets with a single request', async () => {
+    fetch.mockResolvedValue(respond({
+      transactions: [{ id: 1, type: 'income', amount: '10', date: range.startDate }],
+      categories: [{ id: 2, type: 'income', name: 'Mango', usage_count: '3' }]
+    }));
+    const result = await appDataApi.getData(range);
+    expect(result.transactions[0]).toMatchObject({ id: '1', amount: 10 });
+    expect(result.categories[0]).toMatchObject({ id: '2', usage_count: 3 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(new URL(fetch.mock.calls[0][0]).searchParams.get('action')).toBe('getAppData');
+  });
+
+  it('falls back to the old endpoints only for an older deployment', async () => {
+    fetch.mockResolvedValueOnce({ ok: true, json: async () => ({ success: false, error: 'Invalid action' }) })
+      .mockResolvedValue(respond([]));
+    expect(await appDataApi.getData(range)).toEqual({ transactions: [], categories: [] });
+    expect(fetch).toHaveBeenCalledTimes(3);
+    await appDataApi.getData(range);
+    expect(fetch).toHaveBeenCalledTimes(3);
   });
 
   it('sends actions and parses successful responses', async () => {

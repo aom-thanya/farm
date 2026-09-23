@@ -4,13 +4,81 @@ function getSpreadsheet() {
   return SpreadsheetApp.openById(SPREADSHEET_ID);
 }
 
-const SESSION_SECONDS = 21600;
+// Find a row using only its ID column; do not download the entire sheet.
+function getHeaders(sheet) {
+  const width = sheet.getLastColumn();
+  return width ? sheet.getRange(1, 1, 1, width).getValues()[0] : [];
+}
+
+function findIdRow(sheet, headers, id) {
+  const column = headers.indexOf('id') + 1;
+  const lastRow = sheet.getLastRow();
+  if (!column || lastRow < 2 || id === undefined || id === null || String(id) === '') return 0;
+  const cell = sheet.getRange(2, column, lastRow - 1, 1)
+    .createTextFinder(String(id)).matchEntireCell(true).matchCase(true)
+    .useRegularExpression(false).findNext();
+  return cell ? cell.getRow() : 0;
+}
+
+// Batch adjacent edited cells without overwriting untouched cells or formulas.
+function writeFields(sheet, row, headers, fields) {
+  const edits = Object.keys(fields)
+    .filter(field => fields[field] !== undefined && headers.indexOf(field) !== -1)
+    .map(field => ({ column: headers.indexOf(field) + 1, value: fields[field] }))
+    .sort((a, b) => a.column - b.column);
+  for (let i = 0; i < edits.length;) {
+    const first = edits[i];
+    const values = [first.value];
+    i++;
+    while (i < edits.length && edits[i].column === first.column + values.length) {
+      values.push(edits[i++].value);
+    }
+    sheet.getRange(row, first.column, 1, values.length).setValues([values]);
+  }
+}
+
+// Fixed lifetime: reopening the browser keeps the same session for 30 days.
+const SESSION_MS = 30 * 24 * 60 * 60 * 1000;
+
+function saveSession(token, id) {
+  const session = { id: String(id), expiresAt: Date.now() + SESSION_MS };
+  PropertiesService.getScriptProperties().setProperty('session_' + token, JSON.stringify(session));
+  return session;
+}
 
 function getSession(data) {
   const token = data && data.token;
   if (typeof token !== 'string' || !/^[0-9a-f-]{36}$/.test(token)) return null;
-  const stored = CacheService.getScriptCache().get('session_' + token);
-  return stored ? JSON.parse(stored) : null;
+  const key = 'session_' + token;
+  const properties = PropertiesService.getScriptProperties();
+  const stored = properties.getProperty(key);
+  if (stored) {
+    const session = JSON.parse(stored);
+    if (session.id && Number.isFinite(session.expiresAt) && session.expiresAt > Date.now()) return session;
+    properties.deleteProperty(key);
+    return null;
+  }
+  // Preserve still-valid sessions from the previous six-hour cache implementation.
+  const legacy = CacheService.getScriptCache().get(key);
+  if (!legacy) return null;
+  const session = JSON.parse(legacy);
+  if (!session.id) return null;
+  const migrated = saveSession(token, session.id);
+  CacheService.getScriptCache().remove(key);
+  return migrated;
+}
+
+function clearExpiredSessions() {
+  const properties = PropertiesService.getScriptProperties();
+  const values = properties.getProperties();
+  Object.keys(values).forEach(key => {
+    if (!key.startsWith('session_')) return;
+    try {
+      const session = JSON.parse(values[key]);
+      if (Number.isFinite(session.expiresAt) && session.expiresAt > Date.now()) return;
+    } catch (_) { /* Remove invalid session records as well. */ }
+    properties.deleteProperty(key);
+  });
 }
 
 function doPost(e) {
@@ -31,6 +99,12 @@ function doPost(e) {
 
     if (action === 'logout') {
       return handleLogout(session, data.token);
+    } else if (action === 'getAppData') {
+      const spreadsheet = getSpreadsheet();
+      return respondSuccess({
+        transactions: readTransactions(data, spreadsheet),
+        categories: readCategories(spreadsheet)
+      });
     } else if (action === 'getTransactions') {
       return getTransactions(data);
     } else if (action === 'getCategories') {
@@ -49,7 +123,7 @@ function doPost(e) {
 
     return respondError("Invalid action");
   } catch (error) {
-    return respondError(error.toString());
+    return respondError(error.message || error.toString());
   }
 }
 
@@ -63,7 +137,7 @@ function doGet(e) {
 
     return respondError("Invalid action");
   } catch (error) {
-    return respondError(error.toString());
+    return respondError(error.message || error.toString());
   }
 }
 
@@ -82,7 +156,8 @@ function handleLogin(data) {
       // Update lastedLogin
       sheet.getRange(i + 1, lastedLoginIndex + 1).setValue(new Date().toISOString());
       const token = Utilities.getUuid();
-      CacheService.getScriptCache().put('session_' + token, JSON.stringify({ id: String(rows[i][idIndex]) }), SESSION_SECONDS);
+      clearExpiredSessions();
+      saveSession(token, rows[i][idIndex]);
       return respondSuccess({
         id: rows[i][idIndex],
         username: rows[i][userIndex],
@@ -94,17 +169,14 @@ function handleLogin(data) {
 }
 
 function handleLogout(session, token) {
+  PropertiesService.getScriptProperties().deleteProperty('session_' + token);
   CacheService.getScriptCache().remove('session_' + token);
   const sheet = getSpreadsheet().getSheetByName('Users');
-  const rows = sheet.getDataRange().getValues();
-  const idIndex = rows[0].indexOf('id');
-  const lastedLogoutIndex = rows[0].indexOf('lastedLogout');
-  
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][idIndex]) === session.id) {
-      sheet.getRange(i + 1, lastedLogoutIndex + 1).setValue(new Date().toISOString());
-      return respondSuccess({ message: "Logout successful" });
-    }
+  const headers = getHeaders(sheet);
+  const row = findIdRow(sheet, headers, session.id);
+  if (row) {
+    writeFields(sheet, row, headers, { lastedLogout: new Date().toISOString() });
+    return respondSuccess({ message: "Logout successful" });
   }
   return respondSuccess({ message: "User not found, but logged out" });
 }
@@ -119,7 +191,8 @@ function addTransaction(data, session) {
       !/^\d{4}-\d{2}-\d{2}$/.test(String(data.date || ''))) {
     return respondError('Invalid transaction');
   }
-  const sheet = getSpreadsheet().getSheetByName('Transactions');
+  const spreadsheet = getSpreadsheet();
+  const sheet = spreadsheet.getSheetByName('Transactions');
   const id = Utilities.getUuid();
   const createdAt = new Date().toISOString();
 
@@ -144,64 +217,71 @@ function addTransaction(data, session) {
   sheet.appendRow(headers.map(header => values[header] ?? ''));
   
   // If a category was used, we might want to update its usage_count
-  updateCategoryUsage(data.category);
+  updateCategoryUsage(data.category, spreadsheet);
 
   return respondSuccess({ id: id, message: "Transaction added successfully" });
 }
 
 function getTransactions(filter) {
+  return respondSuccess(readTransactions(filter, getSpreadsheet()));
+}
+
+function readTransactions(filter, spreadsheet) {
   const startDate = String(filter.startDate || '');
   const endDate = String(filter.endDate || '');
   if (!/^\d{4}-\d{2}-\d{2}$/.test(startDate) || !/^\d{4}-\d{2}-\d{2}$/.test(endDate) || startDate > endDate) {
-    return respondError('Invalid date filter');
+    throw new Error('Invalid date filter');
   }
-  const spreadsheet = getSpreadsheet();
-  const sheet = spreadsheet.getSheetByName('Transactions');
-  const rows = sheet.getDataRange().getValues();
-  if (rows.length < 2) return respondSuccess([]);
-  
+  const rows = spreadsheet.getSheetByName('Transactions').getDataRange().getValues();
+  if (rows.length < 2) return [];
   const headers = rows[0];
+  const createdIndex = headers.indexOf('created_at');
+  const typeIndex = headers.indexOf('type');
+  const dateIndex = headers.indexOf('date');
+  const amountIndex = headers.indexOf('amount');
+  let timeZone;
+  const dates = new Map();
   const result = [];
-  
+
   for (let i = 1; i < rows.length; i++) {
-    let rowData = {};
-    for (let j = 0; j < headers.length; j++) {
-      rowData[headers[j]] = rows[i][j];
-    }
-    const isLegacyShiftedRow = ['income', 'expense'].indexOf(String(rowData.created_at).toLowerCase()) !== -1;
-    const type = isLegacyShiftedRow ? String(rowData.created_at).toLowerCase() : String(rowData.type).toLowerCase();
+    const row = rows[i];
+    const legacyType = String(row[createdIndex]).toLowerCase();
+    const isLegacyShiftedRow = ['income', 'expense'].indexOf(legacyType) !== -1;
+    const type = isLegacyShiftedRow ? legacyType : String(row[typeIndex]).toLowerCase();
     if (['income', 'expense'].indexOf(type) === -1) continue;
-    const rawDate = isLegacyShiftedRow ? rowData.amount : rowData.date;
-    const parsedDate = rawDate instanceof Date ? rawDate : new Date(rawDate);
-    if (Number.isNaN(parsedDate.getTime())) continue;
-    const date = rawDate instanceof Date
-      ? Utilities.formatDate(rawDate, spreadsheet.getSpreadsheetTimeZone(), 'yyyy-MM-dd')
-      : /^\d{4}-\d{2}-\d{2}$/.test(String(rawDate))
-        ? String(rawDate)
-        : Utilities.formatDate(parsedDate, spreadsheet.getSpreadsheetTimeZone(), 'yyyy-MM-dd');
-    if (date >= startDate && date <= endDate) {
-      if (isLegacyShiftedRow) rowData.amount = date;
-      else rowData.date = date;
-      result.push(rowData);
+    const rawDate = row[isLegacyShiftedRow ? amountIndex : dateIndex];
+    let date;
+    if (typeof rawDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+      date = rawDate;
+    } else {
+      const parsedDate = rawDate instanceof Date ? rawDate : new Date(rawDate);
+      const timestamp = parsedDate.getTime();
+      if (Number.isNaN(timestamp)) continue;
+      date = dates.get(timestamp);
+      if (!date) {
+        // Read the spreadsheet setting once, and format each distinct date once.
+        if (!timeZone) timeZone = spreadsheet.getSpreadsheetTimeZone();
+        date = Utilities.formatDate(parsedDate, timeZone, 'yyyy-MM-dd');
+        dates.set(timestamp, date);
+      }
     }
+    if (date < startDate || date > endDate) continue;
+    // Build response objects only for matching rows.
+    const rowData = {};
+    for (let j = 0; j < headers.length; j++) rowData[headers[j]] = row[j];
+    if (isLegacyShiftedRow) rowData.amount = date;
+    else rowData.date = date;
+    result.push(rowData);
   }
-  return respondSuccess(result);
+  return result;
 }
 
 function deleteTransaction(data) {
   const sheet = getSpreadsheet().getSheetByName('Transactions');
-  const rows = sheet.getDataRange().getValues();
-  if (rows.length < 2) return respondError("Transaction not found");
-
-  const idIndex = rows[0].indexOf('id');
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][idIndex]) === String(data.id)) {
-      sheet.deleteRow(i + 1);
-      return respondSuccess({ message: "Transaction deleted" });
-    }
-  }
-
-  return respondError("Transaction not found");
+  const row = findIdRow(sheet, getHeaders(sheet), data.id);
+  if (!row) return respondError("Transaction not found");
+  sheet.deleteRow(row);
+  return respondSuccess({ message: "Transaction deleted" });
 }
 
 function addCategory(data) {
@@ -225,29 +305,21 @@ function addCategory(data) {
 
 function updateCategory(data) {
   const sheet = getSpreadsheet().getSheetByName('Categories');
-  const rows = sheet.getDataRange().getValues();
-  const headers = rows[0];
-  const idIndex = headers.indexOf('id');
-
-  for (let i = 1; i < rows.length; i++) {
-    if (String(rows[i][idIndex]) === String(data.id)) {
-      ['type', 'name', 'emoji'].forEach(field => {
-        const fieldIndex = headers.indexOf(field);
-        if (fieldIndex !== -1 && data[field] !== undefined) {
-          sheet.getRange(i + 1, fieldIndex + 1).setValue(data[field]);
-        }
-      });
-      return respondSuccess({ message: "Category updated successfully" });
-    }
-  }
-
-  return respondError("Category not found");
+  const headers = getHeaders(sheet);
+  const row = findIdRow(sheet, headers, data.id);
+  if (!row) return respondError("Category not found");
+  writeFields(sheet, row, headers, { type: data.type, name: data.name, emoji: data.emoji });
+  return respondSuccess({ message: "Category updated successfully" });
 }
 
 function getCategories() {
-  const sheet = getSpreadsheet().getSheetByName('Categories');
+  return respondSuccess(readCategories(getSpreadsheet()));
+}
+
+function readCategories(spreadsheet) {
+  const sheet = spreadsheet.getSheetByName('Categories');
   const rows = sheet.getDataRange().getValues();
-  if (rows.length < 2) return respondSuccess([]);
+  if (rows.length < 2) return [];
   
   const headers = rows[0];
   const result = [];
@@ -259,37 +331,27 @@ function getCategories() {
     }
     result.push(rowData);
   }
-  return respondSuccess(result);
+  return result;
 }
 
 function deleteCategory(data) {
   const sheet = getSpreadsheet().getSheetByName('Categories');
-  const rows = sheet.getDataRange().getValues();
-  const idIndex = rows[0].indexOf('id');
-  
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i][idIndex] === data.id) {
-      sheet.deleteRow(i + 1);
-      return respondSuccess({ message: "Category deleted" });
-    }
-  }
-  return respondError("Category not found");
+  const row = findIdRow(sheet, getHeaders(sheet), data.id);
+  if (!row) return respondError("Category not found");
+  sheet.deleteRow(row);
+  return respondSuccess({ message: "Category deleted" });
 }
 
-function updateCategoryUsage(categoryId) {
+function updateCategoryUsage(categoryId, spreadsheet) {
   if (!categoryId) return;
-  const sheet = getSpreadsheet().getSheetByName('Categories');
-  const rows = sheet.getDataRange().getValues();
-  const idIndex = rows[0].indexOf('id');
-  const usageIndex = rows[0].indexOf('usage_count');
-  
-  for (let i = 1; i < rows.length; i++) {
-    if (rows[i][idIndex] === categoryId) {
-      const currentVal = parseInt(rows[i][usageIndex]) || 0;
-      sheet.getRange(i + 1, usageIndex + 1).setValue(currentVal + 1);
-      break;
-    }
-  }
+  const sheet = (spreadsheet || getSpreadsheet()).getSheetByName('Categories');
+  const headers = getHeaders(sheet);
+  const usageColumn = headers.indexOf('usage_count') + 1;
+  if (!usageColumn) return;
+  const row = findIdRow(sheet, headers, categoryId);
+  if (!row) return;
+  const cell = sheet.getRange(row, usageColumn);
+  cell.setValue((parseInt(cell.getValue(), 10) || 0) + 1);
 }
 
 function respondSuccess(data) {
@@ -337,6 +399,6 @@ function setupSheets() {
       ['expense_4', 'expense', 'น้ำมันรถ', '⛽', 0],
     ];
     
-    defaults.forEach(d => catSheet.appendRow(d));
+    catSheet.getRange(2, 1, defaults.length, defaults[0].length).setValues(defaults);
   }
 }

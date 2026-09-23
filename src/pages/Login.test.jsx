@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import Login from './Login';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, MemoryRouter, Routes, Route } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { authApi } from '../api/gasApi';
 
@@ -18,10 +18,17 @@ const mockSetUser = vi.fn();
 describe('Login Component', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    useStore.mockImplementation(() => {
-      // Return mockSetUser when the component selects state.setUser
-      return mockSetUser;
-    });
+    useStore.mockImplementation(selector => selector({ setUser: mockSetUser, user: null }));
+  });
+
+  it('redirects an already signed-in user to the home page', () => {
+    useStore.mockImplementation(selector => selector({ setUser: mockSetUser, user: { token: 'saved-token' } }));
+    render(<MemoryRouter initialEntries={['/login']}><Routes>
+      <Route path="/login" element={<Login />} />
+      <Route path="/" element={<div>Home page</div>} />
+    </Routes></MemoryRouter>);
+    expect(screen.getByText('Home page')).toBeInTheDocument();
+    expect(authApi.login).not.toHaveBeenCalled();
   });
 
   it('renders login form correctly', () => {

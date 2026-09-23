@@ -31,9 +31,7 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
   const user = useStore(state => state.user);
   const addTransaction = useStore(state => state.addTransaction);
   const addCategory = useStore(state => state.addCategory);
-  const setTransactions = useStore(state => state.setTransactions);
-  const setCategories = useStore(state => state.setCategories);
-  const dateFilter = useStore(state => state.dateFilter);
+  const updateCategory = useStore(state => state.updateCategory);
   
   const amount = useMemo(() => {
     const p = parseFloat(price) || 0;
@@ -119,21 +117,15 @@ export default function AddTransactionModal({ isOpen, onClose, type }) {
       setIsSubmitting(true);
       try {
         const result = await transactionApi.addTransaction(newTx);
-        const range = transactionFilterRange(dateFilter);
+        const current = useStore.getState();
+        if (current.user?.token !== user?.token) return;
+        const range = transactionFilterRange(current.dateFilter);
         if (range && newTx.date >= range.startDate && newTx.date <= range.endDate) {
           addTransaction({ ...newTx, id: String(result.data.id) });
         }
+        const category = current.categories.find(item => item.id === selectedCategory.id);
+        if (category) updateCategory({ ...category, usage_count: (Number(category.usage_count) || 0) + 1 });
         onClose();
-        try {
-          const [transactions, categoriesResult] = await Promise.all([
-            range ? transactionApi.getTransactions(range) : Promise.resolve(null),
-            categoryApi.getCategories()
-          ]);
-          if (transactions) setTransactions(transactions.data);
-          setCategories(categoriesResult.data);
-        } catch (refreshError) {
-          console.error('Failed to refresh after saving:', refreshError);
-        }
       } catch (error) {
         console.error(error);
         alert('เกิดข้อผิดพลาดในการบันทึกข้อมูล โปรดลองใหม่อีกครั้ง');

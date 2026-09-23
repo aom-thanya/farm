@@ -28,6 +28,19 @@ describe('useStore', () => {
     expect(useStore.getState().user).toEqual({ id: 'u1', username: 'admin' });
   });
 
+  it('restores the saved session when the app reloads, but not after logout', async () => {
+    const user = { id: 'u1', username: 'admin', token: 'saved-token' };
+    useStore.getState().setUser(user);
+    const saved = localStorage.getItem('farm-money-storage');
+    useStore.setState({ user: null });
+    localStorage.setItem('farm-money-storage', saved);
+    await useStore.persist.rehydrate();
+    expect(useStore.getState().user).toEqual(user);
+    useStore.getState().logout();
+    await useStore.persist.rehydrate();
+    expect(useStore.getState().user).toBeNull();
+  });
+
   it('logout clears user, transactions, and categories', () => {
     useStore.setState({
       user: { id: 'u1' },

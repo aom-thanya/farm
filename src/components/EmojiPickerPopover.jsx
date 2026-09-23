@@ -1,7 +1,8 @@
-import { useState, useRef, useEffect } from 'react';
-import EmojiPicker from 'emoji-picker-react';
+import { lazy, Suspense, useState, useRef, useEffect } from 'react';
 import { X, LayoutGrid } from 'lucide-react';
 import { cn } from '../lib/utils';
+
+const EmojiPicker = lazy(() => import('emoji-picker-react'));
 
 const incomeEmojis = [
   { group: 'เงินและรายได้', emojis: ['💰', '💵', '🪙', '🧾', '📈', '🤝'] },
@@ -117,6 +118,7 @@ export default function EmojiPickerPopover({ type, selectedEmoji, onSelect, onCl
             </div>
           ) : (
             <div className="flex justify-center -mx-4 pb-4">
+              <Suspense fallback={<p role="status">กำลังโหลด Emoji...</p>}>
               <EmojiPicker 
                 onEmojiClick={onFullPickerSelect}
                 searchPlaceholder="ค้นหา Emoji..."
@@ -124,6 +126,7 @@ export default function EmojiPickerPopover({ type, selectedEmoji, onSelect, onCl
                 height={400}
                 lazyLoadEmojis={true}
               />
+              </Suspense>
             </div>
           )}
         </div>

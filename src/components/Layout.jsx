@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { format, addMonths, subMonths } from 'date-fns';
 import { th } from 'date-fns/locale';
 import AddTransactionModal from './AddTransactionModal';
-import { transactionApi, categoryApi, authApi } from '../api/gasApi';
+import { appDataApi, authApi } from '../api/gasApi';
 
 export default function Layout() {
   const user = useStore(state => state.user);
@@ -24,15 +24,21 @@ export default function Layout() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [loadError, setLoadError] = useState('');
+  const [refreshVersion, setRefreshVersion] = useState(0);
+  const isLoading = useStore(state => state.isLoading);
+  const token = user?.token;
+  const range = transactionFilterRange(dateFilter);
+  const startDate = range?.startDate;
+  const endDate = range?.endDate;
 
   useEffect(() => {
-    if (!user) return;
+    if (!token) return;
     let cancelled = false;
     
     const loadData = async (showLoading = true) => {
       if (showLoading) setLoading(true);
       setLoadError('');
-      const range = transactionFilterRange(dateFilter);
+      const range = startDate && endDate ? { startDate, endDate } : null;
       if (!range) {
         setTransactions([]);
         setLoadError('กรุณาเลือกช่วงวันที่ให้ถูกต้อง');
@@ -40,23 +46,15 @@ export default function Layout() {
         return;
       }
       try {
-        const [txRes, catRes] = await Promise.all([
-          transactionApi.getTransactions(range),
-          categoryApi.getCategories()
-        ]);
+        const data = await appDataApi.getData(range);
         if (cancelled) return;
-        if (txRes.success) {
-          setTransactions(txRes.data);
-        }
-        if (catRes.success) {
-          setCategories(catRes.data);
-        }
+        setTransactions(data.transactions);
+        setCategories(data.categories);
       } catch (error) {
         if (cancelled) return;
         console.error('Failed to load data:', error);
         if (error.message === 'UNAUTHORIZED') {
           logout();
-          navigate('/login');
           return;
         }
         setTransactions([]);
@@ -66,23 +64,13 @@ export default function Layout() {
       }
     };
     
-    loadData();
-
-    // Auto-refresh when user switches back to this tab (e.g., after editing in Google Sheets)
-    const handleFocus = () => loadData(false); // false = no skeleton loading flash
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') loadData(false);
-    };
-
-    window.addEventListener('focus', handleFocus);
-    window.addEventListener('visibilitychange', handleVisibilityChange);
-
+    // Coalesce rapid date changes and StrictMode's initial effect replay.
+    const timer = setTimeout(() => loadData(), 250);
     return () => {
       cancelled = true;
-      window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearTimeout(timer);
     };
-  }, [user, dateFilter, setCategories, setLoading, setTransactions, logout, navigate]);
+  }, [token, startDate, endDate, refreshVersion, setCategories, setLoading, setTransactions, logout]);
 
   // Close mobile menu when route changes
   useEffect(() => {
@@ -214,6 +202,10 @@ export default function Layout() {
 
       {/* Main Content Area */}
       <main className="p-4 md:p-8 max-w-6xl mx-auto flex flex-col min-h-screen">
+        <button type="button" disabled={isLoading} className="mb-4 self-end text-farm-700 disabled:opacity-50" onClick={() => {
+          appDataApi.invalidate();
+          setRefreshVersion(value => value + 1);
+        }}>รีเฟรชข้อมูล</button>
         {loadError && <p role="alert" className="mb-4 text-red-600">{loadError}</p>}
         
         {/* Top Header (Month Selector & Add Buttons) */}

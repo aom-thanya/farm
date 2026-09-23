@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Navigate, useNavigate } from 'react-router-dom';
 import { useStore } from '../store/useStore';
 import { authApi } from '../api/gasApi';
 import { Loader2 } from 'lucide-react';
@@ -11,6 +11,9 @@ export default function Login() {
   const [loading, setLoading] = useState(false);
   const setUser = useStore(state => state.setUser);
   const navigate = useNavigate();
+  const user = useStore(state => state.user);
+
+  if (user?.token) return <Navigate to="/" replace />;
 
   const handleLogin = async (e) => {
     e.preventDefault();
